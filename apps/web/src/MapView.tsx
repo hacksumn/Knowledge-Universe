@@ -3,7 +3,8 @@ import ForceGraph3D, { type ForceGraphMethods } from 'react-force-graph-3d';
 import * as THREE from 'three';
 import SpriteText from 'three-spritetext';
 import { ArrowUpRight, BookOpen, Bookmark, Check, ChevronLeft, ChevronRight, Home, List as ListIcon, Orbit, Pause, Play } from 'lucide-react';
-import { continents, continentById, pathways, pathwaysIn, type ContinentId, type Pathway } from './catalogue';
+import { continents, continentById, pathways, pathwaysIn, resolveRelated, type ContinentId, type Pathway } from './catalogue';
+import { ConnectedTo } from './connected';
 import { buildMapGraph, subjectPosition, nodeId, HUB_ID, GLOBE_RADIUS, type Expansion, type MapNodeSpec, type MapLinkSpec } from './mapGraph';
 
 type MapNode = MapNodeSpec & { x?: number; y?: number; z?: number; fx?: number; fy?: number; fz?: number };
@@ -263,7 +264,7 @@ export default function MapView({ saved, onToggleSave, onOpenPathway, onShowList
       }, { initialize: (nodes: MapNode[]) => { simNodes = nodes; } });
       api.d3Force('shell', shell as never);
       api.d3Force('charge')?.strength((n: MapNode) => n.kind === 'lesson' ? -45 : -90);
-      api.d3Force('link')?.distance((l: MapLink) => l.kind === 'lesson' ? 48 : l.kind === 'pathway' ? (idOf(l.target) === expandedPathway.current ? 130 : 85) : GLOBE_RADIUS).strength((l: MapLink) => l.kind === 'subject' ? 0 : 1);
+      api.d3Force('link')?.distance((l: MapLink) => l.kind === 'lesson' ? 48 : l.kind === 'pathway' ? (idOf(l.target) === expandedPathway.current ? 130 : 85) : GLOBE_RADIUS).strength((l: MapLink) => l.kind === 'subject' || l.kind === 'cross' ? 0 : 1);
       const controls = api.controls() as unknown as { autoRotateSpeed: number; minDistance: number; maxDistance: number; enableDamping: boolean; addEventListener: (t: string, f: () => void) => void };
       controls.autoRotateSpeed = .35; controls.minDistance = 30; controls.maxDistance = 2600; controls.enableDamping = true;
       controls.addEventListener('start', () => setSpin(false));
@@ -323,6 +324,13 @@ export default function MapView({ saved, onToggleSave, onOpenPathway, onShowList
     onOpenPathway(pathwayById[pathwayId], lessonId);
   }, [onOpenPathway]);
 
+  // Following a cross-link flies to the target pathway, and opens the lesson if the link points at one.
+  const followRelated = useCallback((id: string) => {
+    const t = resolveRelated(id); if (!t) return;
+    openPathway(t.pathway.id);
+    if (t.lesson) openLesson(t.pathway.id, t.lesson.id);
+  }, [openPathway, openLesson]);
+
   const onNodeClick = useCallback((n: MapNode) => {
     if (n.kind === 'hub') return reset();
     if (n.kind === 'subject') {
@@ -346,6 +354,7 @@ export default function MapView({ saved, onToggleSave, onOpenPathway, onShowList
   }), [focusedNodeId, expansion.subject, mobile]);
 
   const linkColor = useCallback((l: MapLink) => {
+    if (l.kind === 'cross') return 'rgba(255,214,250,0.7)';
     if (l.kind === 'subject') { const sid = idOf(l.target); const lit = !expansion.subject || sid === nodeId.subject(expansion.subject); return lit ? 'rgba(255,150,235,0.32)' : 'rgba(200,160,255,0.10)'; }
     const c = new THREE.Color((cache.current.get(idOf(l.target))?.color) ?? '#ffffff');
     return `rgba(${Math.round(c.r * 255)},${Math.round(c.g * 255)},${Math.round(c.b * 255)},${l.kind === 'pathway' ? .65 : .45})`;
@@ -382,10 +391,12 @@ export default function MapView({ saved, onToggleSave, onOpenPathway, onShowList
       enableNodeDrag={false}
       linkColor={linkColor}
       linkOpacity={1}
-      linkWidth={(l: MapLink) => l.kind === 'pathway' ? .7 : l.kind === 'lesson' ? .35 : 0}
-      linkDirectionalParticles={(l: MapLink) => l.kind === 'subject' ? (expansion.subject && idOf(l.target) === nodeId.subject(expansion.subject) ? 3 : 1) : 2}
-      linkDirectionalParticleSpeed={(l: MapLink) => l.kind === 'subject' ? .0035 : .007}
-      linkDirectionalParticleWidth={(l: MapLink) => l.kind === 'subject' ? 1.8 : 1.2}
+      linkWidth={(l: MapLink) => l.kind === 'cross' ? .9 : l.kind === 'pathway' ? .7 : l.kind === 'lesson' ? .35 : 0}
+      linkCurvature={(l: MapLink) => l.kind === 'cross' ? .3 : 0}
+      linkLabel={(l: MapLink) => l.kind === 'cross' && l.reason ? `<div class="map-tooltip">${escapeHtml(l.reason)}</div>` : ''}
+      linkDirectionalParticles={(l: MapLink) => l.kind === 'cross' ? 3 : l.kind === 'subject' ? (expansion.subject && idOf(l.target) === nodeId.subject(expansion.subject) ? 3 : 1) : 2}
+      linkDirectionalParticleSpeed={(l: MapLink) => l.kind === 'subject' ? .0035 : l.kind === 'cross' ? .005 : .007}
+      linkDirectionalParticleWidth={(l: MapLink) => l.kind === 'subject' ? 1.8 : l.kind === 'cross' ? 2 : 1.2}
       linkDirectionalParticleColor={linkColor}
       d3VelocityDecay={.32}
       cooldownTime={5000}
@@ -426,6 +437,7 @@ export default function MapView({ saved, onToggleSave, onOpenPathway, onShowList
         <h2>{pathway.title}</h2>
         <p className="map-panel-text">{pathway.description}</p>
         <ol className="map-list numbered">{pathway.lessons.map((l, i) => <li key={l.id}><button className={focus.kind === 'lesson' && focus.id === l.id ? 'active' : ''} onClick={() => openLesson(pathway.id, l.id)}><span className="map-num">{String(i + 1).padStart(2, '0')}</span><span>{l.title}</span><BookOpen size={14} /></button></li>)}</ol>
+        <ConnectedTo items={pathway.related} onOpen={followRelated} compact />
         <div className="map-actions">
           <button className="primary" onClick={() => onOpenPathway(pathway)}>Start pathway <ArrowUpRight size={15} /></button>
           <button className="map-save" onClick={() => onToggleSave(pathway.id)} aria-pressed={saved.includes(pathway.id)}>{saved.includes(pathway.id) ? <><Check size={15} /> Saved</> : <><Bookmark size={15} /> Save</>}</button>

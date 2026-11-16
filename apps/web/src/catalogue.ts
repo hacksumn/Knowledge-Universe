@@ -21,11 +21,16 @@ export type Continent = {
   description: string;
 };
 
+/** A link to another pathway (id `pathway-id`) or lesson (id `pathway-id/lesson-slug`), with why they connect. */
+export type RelatedRef = { id: string; kind: 'pathway' | 'lesson'; reason: string };
+
 export type Lesson = {
   id: string;
   title: string;
   summary: string;
   body?: string;
+  /** Cross-links to pathways or lessons elsewhere in the catalogue (filled from `connections` below). */
+  related: RelatedRef[];
 };
 
 export type Pathway = {
@@ -34,6 +39,8 @@ export type Pathway = {
   title: string;
   description: string;
   lessons: Lesson[];
+  /** Cross-links to pathways or lessons elsewhere in the catalogue (filled from `connections` below). */
+  related: RelatedRef[];
 };
 
 export const continents: Continent[] = [
@@ -50,7 +57,7 @@ export const continents: Continent[] = [
 export const slug = (s: string) => s.toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
 function pathway(continent: ContinentId, id: string, title: string, description: string, lessons: [string, string][]): Pathway {
-  return { id, continent, title, description, lessons: lessons.map(([t, summary]) => { const lessonId = `${id}/${slug(t)}`; return { id: lessonId, title: t, summary, body: lessonBodies[lessonId] }; }) };
+  return { id, continent, title, description, related: [], lessons: lessons.map(([t, summary]) => { const lessonId = `${id}/${slug(t)}`; return { id: lessonId, title: t, summary, body: lessonBodies[lessonId], related: [] }; }) };
 }
 
 export const pathways: Pathway[] = [
@@ -226,6 +233,77 @@ export const pathways: Pathway[] = [
 ];
 
 export const continentById = Object.fromEntries(continents.map(c => [c.id, c])) as Record<ContinentId, Continent>;
+
+// ── Cross-links ────────────────────────────────────────────────────────────
+// Each connection is listed once and applied to both ends. An end is a pathway id
+// ("probability-calibration") or a lesson id ("nba-moneylines/walk-forward-validation").
+export const connections: [string, string, string][] = [
+  // Your example: probability calibration joins Machine Learning and Prediction Models.
+  ['probability-calibration', 'nba-moneylines', 'A moneyline model is only useful if its win probabilities are calibrated.'],
+  ['probability-calibration/what-calibration-means', 'nba-moneylines/calibrating-win-probabilities', 'The general idea of calibration, applied to NBA win probabilities.'],
+  ['probability-calibration/brier-score-and-log-loss', 'supervised-learning/loss-functions', 'Log loss is both a training loss and a score for probability forecasts.'],
+  ['probability-calibration', 'bankroll-and-risk', 'Expected value and Kelly stakes depend on honest probabilities.'],
+  // Machine Learning ↔ Prediction Models
+  ['supervised-learning/train-validation-and-test-splits', 'time-aware-validation/why-random-splits-fail-on-time-series', 'Standard splits need a time-aware version when you forecast the future.'],
+  ['supervised-learning/overfitting-and-regularization', 'bayesian-forecasting/shrinkage-toward-the-average', 'Shrinkage and regularization both trade a little bias for less variance.'],
+  ['gradient-boosted-trees', 'nba-moneylines', 'Boosted trees are a strong default model for tabular game features.'],
+  // Prediction Models internal
+  ['time-aware-validation/rolling-and-expanding-windows', 'nba-moneylines/walk-forward-validation', 'Walk-forward validation is built from rolling or expanding windows.'],
+  ['time-aware-validation/data-leakage', 'nba-moneylines/team-strength-features', 'Every team feature must be computed only from games before tip-off.'],
+  ['bayesian-forecasting/updating-ratings-game-by-game', 'nba-moneylines/team-strength-features', 'Game-by-game ratings are the core team-strength feature.'],
+  // Sports Gambling ↔ Prediction Models
+  ['odds-and-implied-probability', 'nba-moneylines', 'Converting moneylines into probabilities is the first step of the model.'],
+  ['market-efficiency/closing-line-value', 'nba-moneylines/benchmarking-against-the-closing-line', 'The closing line is both a benchmark for models and a measure of bet timing.'],
+  ['odds-and-implied-probability/implied-probability', 'bankroll-and-risk/expected-value', 'Expected value compares your probability with the price’s implied probability.'],
+  ['time-aware-validation/backtesting-with-realistic-timing', 'market-efficiency/liquidity-and-limits', 'Realistic backtests use prices and stakes you could actually have bet.'],
+  // Machine Learning ↔ LLMs
+  ['neural-network-basics', 'transformers', 'Transformers are deep neural networks built from attention and feed-forward layers.'],
+  ['neural-network-basics/embeddings-as-learned-features', 'transformers/embeddings', 'Token embeddings are learned features, trained like any other weights.'],
+  // LLMs internal
+  ['transformers/self-attention', 'inference-and-serving/the-kv-cache', 'The KV cache stores attention keys and values so decoding stays fast.'],
+  // LLMs ↔ Data Centers
+  ['inference-and-serving', 'gpu-clusters', 'Model serving runs on GPU servers and clusters.'],
+  ['inference-and-serving/batching-and-throughput', 'gpu-clusters/scheduling-training-and-inference', 'Batching and scheduling decide how much useful work each GPU does.'],
+  // Data Centers internal
+  ['gpu-clusters/rack-power-density', 'critical-power/pdus-and-branch-circuits', 'Dense GPU racks need more and larger branch circuits.'],
+  ['gpu-clusters/rack-power-density', 'cooling-systems/direct-to-chip-liquid-cooling', 'High rack densities push cooling from air to liquid.'],
+  // LLMs ↔ Agents
+  ['adapting-llms/prompting-and-context', 'the-agent-loop', 'An agent is a prompt-driven model running in a loop with tools.'],
+  ['adapting-llms/retrieval-augmented-generation', 'agent-memory/retrieval-for-agents', 'Agents use the same retrieval techniques as RAG, but decide when to search.'],
+  ['adapting-llms/evaluating-outputs', 'evaluating-agents', 'Agent evaluation extends output grading to multi-step tasks.'],
+  ['evaluating-agents/cost-and-latency-budgets', 'inference-and-serving', 'Agent cost and latency come from the tokens each model call processes.'],
+  // Agents ↔ Possible Use Cases for AI
+  ['tools-and-mcp/validating-and-authorizing-tool-calls', 'ai-in-operations/automating-runbooks-with-agents', 'Runbook automation depends on narrow permissions and approvals.'],
+  ['tools-and-mcp/validating-and-authorizing-tool-calls', 'choosing-a-use-case/risks-privacy-and-oversight', 'Tool permissions are where AI oversight is enforced in code.'],
+  ['evaluating-agents', 'choosing-a-use-case/pilots-and-success-metrics', 'A pilot needs the same success metrics as an agent evaluation.'],
+  // Possible Use Cases for AI ↔ Data Centers / Prediction Models
+  ['ai-in-operations/predictive-maintenance', 'critical-power/generators-and-transfer-switches', 'Generators, UPS batteries and switchgear are prime predictive-maintenance targets.'],
+  ['ai-in-operations/anomaly-detection-in-telemetry', 'cooling-systems', 'Cooling telemetry is a common source of early warning signs.'],
+  ['ai-for-analysts/model-assisted-forecasting', 'time-aware-validation/data-leakage', 'LLM-assisted forecasts can leak outcomes the model already knows.'],
+  // PCB Diagnostics ↔ Data Centers / Prediction Models
+  ['power-rail-faults/current-limiting-during-diagnosis', 'critical-power/utility-service-and-switchgear', 'Both limit fault energy: current limits on the bench, protective devices in the building.'],
+  ['power-rail-faults/power-sequencing', 'critical-power/generators-and-transfer-switches', 'Both bring power up in a defined order with checks at each step.'],
+  ['signal-tracing/fault-isolation-strategy', 'bayesian-forecasting/priors-likelihoods-and-posteriors', 'Bayesian updating ranks fault hypotheses as measurements arrive.'],
+];
+
+const pathwayIndex = new Map(pathways.map(p => [p.id, p]));
+const lessonIndex = new Map(pathways.flatMap(p => p.lessons.map(l => [l.id, l] as const)));
+/** Connection ends that do not match any pathway or lesson (should always be empty; checked by tests). */
+export const unresolvedConnections: string[] = [];
+for (const [a, b, reason] of connections) {
+  const ends = [a, b].map(id => pathwayIndex.get(id) ?? lessonIndex.get(id));
+  [a, b].forEach((id, i) => { if (!ends[i]) unresolvedConnections.push(id); });
+  if (!ends[0] || !ends[1] || a === b) continue;
+  ends[0].related.push({ id: b, kind: b.includes('/') ? 'lesson' : 'pathway', reason });
+  ends[1].related.push({ id: a, kind: a.includes('/') ? 'lesson' : 'pathway', reason });
+}
+
+/** Look up the pathway (and lesson, for lesson ids) that a related id points to. */
+export function resolveRelated(id: string): { pathway: Pathway; lesson?: Lesson; continent: Continent } | undefined {
+  const lesson = lessonIndex.get(id);
+  const pathway = lesson ? pathwayIndex.get(id.split('/')[0]) : pathwayIndex.get(id);
+  return pathway ? { pathway, lesson, continent: continentById[pathway.continent] } : undefined;
+}
 
 export const pathwaysIn = (id: ContinentId) => pathways.filter(p => p.continent === id);
 

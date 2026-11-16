@@ -52,3 +52,10 @@ Next: Phase 2 map view, Phase 3 `related` cross-links, Phase 4 logo.
 - Hover a subject (real mouse movement only) to expand it in place; click to fly in; pathways expand to lessons; lessons open the reading drawer. Hover expansion is ignored for touch input, stale pointer positions and during camera flights.
 - Side panel / mobile bottom sheet mirrors the map for keyboard and touch use. WebGL-unavailable fallback links to the list view. Reduced-motion preference disables camera animation and drift.
 - Verified with Playwright using software WebGL at 1440×900 and 390×844: hover expansion, panel navigation, pathway expansion, lesson drawer, canvas click, list toggle and search, no console errors.
+
+## Phase 3 — Cross-links
+
+- `related` field on every pathway and lesson, filled symmetrically from one `connections` list in `catalogue.ts` (34 links, each with a one-line reason; every subject has at least one). Includes the requested example: Probability Calibration (Machine Learning) ↔ NBA Moneylines (Prediction Models), at both pathway and lesson level.
+- "Connected to" rows in the pathway drawer (pathway level and inside each lesson) and in the map panel; following a link opens the target pathway and, for lesson links, the target lesson. On the map the camera flies to the target.
+- Globe: curved arcs with moving particles from the open subject's pathways and lessons to connected subjects; hovering an arc shows its reason. Arcs do not affect the layout.
+- Tests: links resolve, are symmetric, not duplicated or self-referential; map arcs only point to other subjects. Browser-verified on desktop and phone with no console errors.

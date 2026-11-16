@@ -83,3 +83,23 @@
  .map-controls .icon-button{width:36px;height:36px}
  .view-toggle{display:none}
 }
+
+/* ── Cross-links ("Connected to") ── */
+.connected{margin:4px 0 22px}
+.map-panel .connected{margin:16px 0 0}
+.connected-label{display:flex;align-items:center;gap:7px;font-size:9px;letter-spacing:1.6px;text-transform:uppercase;color:#9aa0b6;font-weight:650;margin-bottom:9px}
+.connected ul{list-style:none;margin:0;padding:0;display:grid;gap:7px}
+.connected li{border:0!important}
+.connected button{width:100%;display:flex;align-items:flex-start;gap:11px;text-align:left;padding:11px 13px;border:1px solid #ffffff14;border-left:2px solid var(--accent);border-radius:8px;background:#ffffff05;color:#e3e6f3}
+.connected button:hover{background:#ffffff0c;border-color:#ffffff26;border-left-color:var(--accent)}
+.connected .color-dot{width:7px;height:7px;margin-top:6px;flex-shrink:0;background:var(--accent)}
+.connected-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.connected-text strong{font-size:12.5px;font-weight:600}
+.connected-text small{font-size:10.5px;color:var(--accent)}
+.connected-text em{font-style:normal;font-size:11px;line-height:1.55;color:#9ea4ba;margin-top:3px}
+.connected button>svg{color:#8a90a6;margin-top:3px;flex-shrink:0}
+.lesson-markdown+.connected{margin-top:16px}
+.connected.compact button{padding:9px 11px}
+.lessons .connected li>button{padding:11px 13px;align-items:flex-start;gap:11px;font-size:inherit;line-height:inherit}
+.lessons .connected li>button:hover{color:#e3e6f3}
+.lessons .connected li>button>svg{margin-left:0;transform:none}

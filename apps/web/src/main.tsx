@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ArrowUpRight, ArrowRight, Search, X, ChevronRight, ChevronDown, Compass, Bookmark, BookOpen, Sparkles, Globe2, Menu, Check, Layers, Orbit, List as ListIcon } from 'lucide-react';
-import { continents, continentById, pathways, pathwaysIn, totalLessons, matchesQuery, matchingLesson, type ContinentId, type Pathway } from './catalogue';
+import { continents, continentById, pathways, pathwaysIn, totalLessons, matchesQuery, matchingLesson, resolveRelated, type ContinentId, type Pathway } from './catalogue';
+import { ConnectedTo } from './connected';
 import { SubjectArt } from './art';
 import { LessonMarkdown } from './lessonMarkdown';
 import './styles.css';
@@ -54,6 +55,12 @@ function App() {
   function openPathway(p: Pathway, lessonId?: string) {
     setOpenLesson(lessonId ?? null); setSelected(p);
     if (lessonId) setTimeout(() => document.getElementById(`lesson-${lessonId}`)?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 320);
+  }
+  // Follow a cross-link: open the target pathway, and the target lesson if the link points at one.
+  function openRelated(id: string) {
+    const t = resolveRelated(id); if (!t) return;
+    openPathway(t.pathway, t.lesson?.id);
+    if (!t.lesson) requestAnimationFrame(() => document.querySelector('.drawer')?.scrollTo({ top: 0, behavior: 'smooth' }));
   }
   function save(id: string) { setSaved(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id]); }
   // Switching from the map to the list renders the list first, then scrolls (see the effect below).
@@ -168,6 +175,7 @@ function App() {
           <h2 id="pathway-title">{selected.title}</h2>
           <div className="drawer-meta"><span><BookOpen size={16} />{selected.lessons.length} lessons</span><button onClick={() => save(selected.id)}>{saved.includes(selected.id) ? <Check size={16} /> : <Bookmark size={16} />} {saved.includes(selected.id) ? 'Saved to collection' : 'Save for later'}</button></div>
           <p className="lesson-intro">{selected.description}</p>
+          <ConnectedTo items={selected.related} onOpen={openRelated} />
           <ol className="lessons">
             {selected.lessons.map((l, i) => {
               const open = openLesson === l.id;
@@ -177,7 +185,7 @@ function App() {
                   <span className="lesson-title">{l.title}{!l.body && <span className="draft-badge">Draft</span>}</span>
                   <ChevronDown size={16} />
                 </button>
-                {open && <div className="lesson-body"><p className="lesson-summary">{l.summary}</p>{l.body ? <LessonMarkdown source={l.body} /> : <p className="stub-note">This lesson is a draft. Write it in <code>apps/web/src/lessons/{selected.id}.md</code> under <code>@@ {l.id.split('/')[1]}</code>.</p>}{i < selected.lessons.length - 1 && <button className="next-lesson" onClick={() => { const next = selected.lessons[i + 1].id; setOpenLesson(next); requestAnimationFrame(() => document.getElementById(`lesson-${next}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })); }}>Next: {selected.lessons[i + 1].title} <ArrowRight size={14} /></button>}</div>}
+                {open && <div className="lesson-body"><p className="lesson-summary">{l.summary}</p>{l.body ? <><LessonMarkdown source={l.body} /><ConnectedTo items={l.related} onOpen={openRelated} /></> : <p className="stub-note">This lesson is a draft. Write it in <code>apps/web/src/lessons/{selected.id}.md</code> under <code>@@ {l.id.split('/')[1]}</code>.</p>}{i < selected.lessons.length - 1 && <button className="next-lesson" onClick={() => { const next = selected.lessons[i + 1].id; setOpenLesson(next); requestAnimationFrame(() => document.getElementById(`lesson-${next}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })); }}>Next: {selected.lessons[i + 1].title} <ArrowRight size={14} /></button>}</div>}
               </li>;
             })}
           </ol>

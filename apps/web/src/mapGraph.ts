@@ -1,11 +1,12 @@
 // Pure graph construction for the 3D map: hub → subjects → pathways → lessons.
 // Only the expanded subject shows its pathways, and only the expanded pathway
 // (which must belong to that subject) shows its lessons.
-import { continents, pathways, continentById, type ContinentId } from './catalogue';
+import { continents, pathways, continentById, resolveRelated, type ContinentId } from './catalogue';
 
 export type MapKind = 'hub' | 'subject' | 'pathway' | 'lesson';
 export type MapNodeSpec = { id: string; kind: MapKind; label: string; color: string; parent: string | null };
-export type MapLinkSpec = { source: string; target: string; kind: Exclude<MapKind, 'hub'> };
+/** `cross` links are cross-links (see catalogue `connections`) drawn from a visible pathway or lesson to the subject it connects to. */
+export type MapLinkSpec = { source: string; target: string; kind: Exclude<MapKind, 'hub'> | 'cross'; reason?: string };
 export type Expansion = { subject: ContinentId | null; pathway: string | null };
 
 export const HUB_ID = 'hub';
@@ -44,6 +45,23 @@ export function buildMapGraph({ subject, pathway }: Expansion) {
           nodes.push({ id: nodeId.lesson(l.id), kind: 'lesson', label: l.title, color, parent: nodeId.pathway(p.id) });
           links.push({ source: nodeId.pathway(p.id), target: nodeId.lesson(l.id), kind: 'lesson' });
         }
+      }
+    }
+  }
+  // Cross-links: from each visible pathway (and, when a pathway is open, each of its lessons) to the
+  // subject on the other end of every connection, skipping links back into the expanded subject.
+  if (subject && continentById[subject]) {
+    const seen = new Set<string>();
+    for (const n of nodes) {
+      if (n.kind !== 'pathway' && n.kind !== 'lesson') continue;
+      const id = n.id.slice(2);
+      const end = n.kind === 'pathway' ? pathways.find(p => p.id === id) : pathways.find(p => p.id === id.split('/')[0])?.lessons.find(l => l.id === id);
+      for (const r of end?.related ?? []) {
+        const t = resolveRelated(r.id);
+        if (!t || t.continent.id === subject) continue;
+        const target = nodeId.subject(t.continent.id), key = `${n.id}|${target}`;
+        if (seen.has(key)) continue; seen.add(key);
+        links.push({ source: n.id, target, kind: 'cross', reason: r.reason });
       }
     }
   }

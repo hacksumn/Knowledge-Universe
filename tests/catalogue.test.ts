@@ -1,5 +1,5 @@
 import {describe,it,expect} from 'vitest';
-import {continents,pathways,continentById,pathwaysIn,totalLessons,matchesQuery,matchingLesson} from '../apps/web/src/catalogue';
+import {continents,pathways,continentById,pathwaysIn,totalLessons,matchesQuery,matchingLesson,connections,unresolvedConnections,resolveRelated} from '../apps/web/src/catalogue';
 import {lessonBodies,parseLessonFile} from '../apps/web/src/lessons';
 import {parseBlocks} from '../apps/web/src/lessonMarkdown';
 
@@ -56,5 +56,26 @@ describe('Knowledge Universe catalogue',()=>{
   expect(blocks.map(b=>b.type)).toEqual(['heading','p','ul','ol','callout','table']);
   expect(blocks[1]).toEqual({type:'p',text:'Para **bold** wraps.'});
   expect(blocks[5]).toEqual({type:'table',header:['A','B'],rows:[['1','2']]});
+ });
+ it('cross-links resolve, are symmetric and include the calibration example',()=>{
+  expect(unresolvedConnections).toEqual([]);
+  const keys=connections.map(([a,b])=>[a,b].sort().join('|'));
+  expect(new Set(keys).size).toBe(keys.length);
+  for(const [a,b,reason] of connections){
+   expect(a).not.toBe(b);expect(reason.length).toBeGreaterThan(30);
+   const ra=resolveRelated(a)!,rb=resolveRelated(b)!;
+   expect(ra.pathway.id).not.toBe(rb.pathway.id);
+   const endA=ra.lesson??ra.pathway,endB=rb.lesson??rb.pathway;
+   expect(endA.related.some(r=>r.id===b&&r.reason===reason)).toBe(true);
+   expect(endB.related.some(r=>r.id===a&&r.reason===reason)).toBe(true);
+  }
+  const cal=pathways.find(p=>p.id==='probability-calibration')!;
+  expect(cal.continent).toBe('machine-learning');
+  expect(cal.related.map(r=>resolveRelated(r.id)!.continent.id)).toContain('prediction-models');
+  expect(resolveRelated('nba-moneylines/walk-forward-validation')?.lesson?.title).toBe('Walk-forward validation');
+  expect(resolveRelated('nope')).toBeUndefined();
+  // Every subject takes part in at least one cross-link.
+  const touched=new Set(connections.flatMap(([a,b])=>[a,b]).map(id=>resolveRelated(id)!.continent.id));
+  expect([...touched].sort()).toEqual(continents.map(c=>c.id).sort());
  });
 });

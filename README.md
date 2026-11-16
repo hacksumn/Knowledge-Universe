@@ -21,6 +21,10 @@ All catalogue content lives in `apps/web/src/catalogue.ts` and is original:
 - 2–4 pathways per subject (25 in total) with 102 lessons.
 - Every lesson has a written body of roughly 400–600 words, ending with a key takeaway.
 
+### Cross-links ("Connected to")
+
+Pathways and lessons carry a `related` field listing connections to other parts of the catalogue. Edit the single `connections` list in `catalogue.ts`: each entry is `[endA, endB, reason]`, where an end is a pathway id (`probability-calibration`) or a lesson id (`nba-moneylines/walk-forward-validation`). Both ends get the link automatically. Links appear as a "Connected to" row on pathways and inside lessons, in the map's side panel, and as glowing arcs on the globe from an open subject's pathways and lessons to the subjects they connect to. `npm test` checks every end resolves and that no link is duplicated.
+
 ### Editing lessons
 
 Lesson text lives in Markdown, one file per pathway: `apps/web/src/lessons/<pathway-id>.md`. Each lesson starts with a marker line `@@ <lesson-slug>`, where the slug is the lesson title in lowercase with hyphens (e.g. `@@ read-a-one-line-diagram`). Titles, summaries and order are set in `catalogue.ts`.

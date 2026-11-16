@@ -32,4 +32,17 @@ describe('3D map graph',()=>{
   for(let i=0;i<ps.length;i++)for(let j=i+1;j<ps.length;j++)expect(Math.hypot(ps[i].x-ps[j].x,ps[i].y-ps[j].y,ps[i].z-ps[j].z)).toBeGreaterThan(150);
   expect(subjectPosition(3)).toEqual(subjectPosition(3));
  });
+ it('draws cross-link arcs from visible pathways and lessons to other subjects only',()=>{
+  expect(buildMapGraph({subject:null,pathway:null}).links.some(l=>l.kind==='cross')).toBe(false);
+  const g=buildMapGraph({subject:'prediction-models',pathway:'nba-moneylines'});valid(g);
+  const cross=g.links.filter(l=>l.kind==='cross');
+  expect(cross.length).toBeGreaterThan(0);
+  expect(cross.every(l=>l.target.startsWith('s:')&&l.target!==nodeId.subject('prediction-models'))).toBe(true);
+  expect(cross.every(l=>(l.reason??'').length>20)).toBe(true);
+  const targets=new Set(cross.map(l=>l.target));
+  expect(targets.has(nodeId.subject('machine-learning'))).toBe(true); // probability calibration, gradient-boosted trees
+  expect(targets.has(nodeId.subject('sports-gambling'))).toBe(true); // odds, closing line
+  expect(cross.some(l=>l.source===nodeId.lesson('nba-moneylines/calibrating-win-probabilities'))).toBe(true);
+  expect(new Set(cross.map(l=>l.source+'|'+l.target)).size).toBe(cross.length);
+ });
 });
