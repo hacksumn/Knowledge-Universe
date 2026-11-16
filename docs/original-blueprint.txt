@@ -1,0 +1,558 @@
+Knowledge Universe
+Product blueprint v1.0 · Fully 3D AI Knowledge Explorer
+
+Concept: A personal AI-powered knowledge universe where you explore technical subjects through interconnected, colorful, floating spheres in three-dimensional space. Every sphere represents a concept. Select one, and AI can explain it, generate deeper branches, identify related knowledge, or help you apply it to a real problem.
+
+We'll use Recursio as the primary reference for how exploration should feel, but create a more immersive, three-dimensional experience with richer technical learning functionality.
+
+Recursio's documented interaction model supports AI-generated child concepts, follow-up questions, descriptions, images, and spatial manipulation. Our additional 3D navigation, cross-domain linking, and technical learning tools are proposed features—not capabilities I'm attributing to Recursio. 
+AI-Powered Knowledge Graph Explorer
+
+1. The visual direction
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+15
+
+
+
+
+
+
+
+
+
+
+
+Visual references for depth, color, spatial structure, and connection styling—not screenshots of the proposed application.
+
+The interface should look like a scientific knowledge network inside a digital universe, not a conventional mind map with a space background.
+Design system
+Visual identity
+
+Dark / spatial / technical
+
+
+AI / LLM
+
+
+Agents
+
+
+Data Centers
+
+
+Betting
+
+
+Models
+
+
+PCB
+
+
+
+Background: near-black navy #080C16 with subtle depth fog. Nodes: colored spheres with restrained glow, variable sizes, and readable labels. Connections: thin, semi-transparent lines with distinct styles for prerequisites and cross-domain relationships.
+
+Typography: Inter for interface text; JetBrains Mono for code, equations, addresses, and technical metadata. Panels use dark translucent surfaces with subtle borders.
+
+Interface layout
+Knowledge Universe
+
+3D Explorer
+
+Search any concept, question, or subject...
+
+
+
+EXPLORER
+
+All Subjects
+
+
+AI & LLMs
+
+
+AI Agents
+
+
+Data Centers
+
+
+Sports Betting
+
+
+Prediction Models
+
+
+PCB Diagnostics
+
+
+
+Orbit • Zoom • Expand • Explore
+
+
+NODE INSPECTOR
+
+Transformers
+AI & LLMs
+Neural architecture using attention mechanisms to process contextual relationships.
+
+Explore deeper
+
+Explain concept
+
+View connections
+
+Sources & notes
+
+
+
+Proposed interface wireframe. The finished center canvas will be an actual interactive Three.js 3D scene, not this static diagram.
+The three main regions are:
+- Left: Knowledge domains, saved maps, filters, and search results.
+- Center: Full-screen-capable 3D knowledge universe.
+- Right: A contextual AI tutor, technical inspector, reference library, and expansion controls.
+The center canvas must remain dominant. Both side panels should collapse so the user can explore without interface clutter.
+2. 3D interactions and behavior
+
+
+
+
+
+
+
+
+
+
+Select a sphere
+
+Smoothly animate the camera toward it. Highlight direct connections, dim unrelated nodes, and display its description in the inspector.
+
+
+
+
+
+
+
+
+
+
+
+
+Expand a concept
+
+Generate 5–8 meaningful child nodes. New spheres emerge near the selected concept, then settle into the graph using a force-directed layout.
+
+
+
+
+
+
+
+
+
+
+
+
+Explore relationships
+
+Rotate, orbit, pan, and zoom in 3D. Double-click to focus. Select an edge to understand why two concepts are connected.
+
+
+
+Other interactions:
+Action	Expected behavior
+Left mouse drag	Orbit camera
+Right mouse drag	Pan camera
+Scroll wheel	Zoom toward focus
+Single click	Select node
+Double-click	Fly camera to node
+Shift + drag node	Reposition and pin sphere
+F	Focus selected node
+E	Expand selected node
+/	Search
+Esc	Deselect or close panel
+Home	Return to universe overview
+
+These controls are design choices, not existing implemented shortcuts.
+
+Critical UX rule: The universe should feel three-dimensional without making information difficult to read. Labels need distance-aware sizing, limited overlap, and a straightforward way to return to a known position. Camera motion must be optional and reduce when the user enables reduced-motion preferences.
+3. The six knowledge domains
+
+AI & Large Language Models
+
+Transformers · Attention · Tokenization · Embeddings · RAG · Fine-tuning · Quantization · Inference
+
+
+
+AI Agents & Automation
+
+MCP · Tool calling · Planning · Memory · Multi-agent systems · Orchestration · Evaluation · Computer use
+
+
+
+Data Centers & Critical Infrastructure
+
+UPS · Switchgear · Generators · PDU · Cooling · BMS/DCIM · Networking · Reliability
+
+
+
+Sports Betting & Market Analysis
+
+Odds · Implied probability · No-vig pricing · Market efficiency · CLV · Bankroll management · EV
+
+
+
+Prediction Models & Data Science
+
+XGBoost · Bayesian inference · Feature engineering · Backtesting · Calibration · Leakage · Validation
+
+
+
+PCB & Electronics Troubleshooting
+
+Voltage rails · MOSFETs · Power sequencing · Oscilloscopes · Short circuits · Logic ICs · Signal tracing
+
+
+
+These categories aren't separate databases. They'll be six visually distinct neighborhoods inside one graph.
+
+For example, Bayesian inference should connect both prediction modeling and PCB fault diagnosis; GPU inference should connect LLMs and data center infrastructure. These are meaningful relationships, not merely visually nearby nodes.
+4. System architecture
+The most important architectural decision is to separate the knowledge graph, 3D visualization, and AI reasoning system.
+
+That allows you to change the visualization or AI provider without destroying your accumulated knowledge.
+React / TypeScript Frontend
+3D canvas, search, inspector, learning tools
+
+3D Rendering Engine
+Three.js + React Force Graph
+
+State Management
+Zustand + TanStack Query
+
+
+
+Node.js API / Application Services
+Graph operations, AI orchestration, research, imports
+
+SQLite
+Nodes, edges, documents, progress, history
+
+LLM Providers
+OpenAI / Anthropic adapters
+
+
+
+Technology decisions
+Layer	Selected technology	Reason
+Frontend	React 19 + TypeScript + Vite	Modern, fast web app development
+3D rendering	react-force-graph-3d + Three.js	Native 3D node physics, links, camera, clicking and dragging
+UI	Tailwind CSS + shadcn/ui	Customizable dark technical interface
+State	Zustand	Lightweight UI and graph interaction state
+API fetching	TanStack Query	Server state caching and synchronization
+Backend	Node.js + Fastify	Typed API and AI orchestration
+Database	SQLite + Drizzle ORM	Local-first, simple persistence
+AI	Provider abstraction + schema validation	Reliable structured concept generation
+Testing	Vitest + Playwright	Unit, integration, browser and interaction tests
+Future deployment	Docker / hosted database	Optional later expansion
+
+react-force-graph-3d is the best initial fit because it already supports 3D graph visualization, force-directed layouts, orbiting, hovering, dragging, and interaction callbacks. It is open source under the MIT license. 
+GitHub+1
+
+
+I'd use that instead of building a custom Three.js rendering engine on day one. A more customized React Three Fiber implementation can come later if we encounter real rendering constraints. The current stable R3F documentation describes React 19 compatibility with R3F v9; its v10 line is still marked alpha. 
+React Three Fiber+1
+
+The data model
+Each node must be a durable record, not just an AI response with a label.
+Example node
+
+{
+  "id": "node_transformers",
+  "title": "Transformer Architecture",
+  "domain": "ai_llms",
+  "summary": "Attention-based neural network architecture",
+  "difficulty": "advanced",
+  "status": "generated",
+  "tags": ["attention", "neural-networks"],
+  "position": { "x": 120, "y": 45, "z": -80 },
+  "pinned": false,
+  "createdAt": "2026-11-15T12:00:00Z"
+}
+  
+
+
+Illustrative record only. The implementation will generate actual IDs and timestamps.
+
+The database should have these core entities:
+Table	Purpose
+universes	Separate saved knowledge universes
+nodes	Concepts and their metadata
+edges	Relationships between concepts
+node_content	Explanations, examples, equations, code
+sources	URLs, titles, excerpts, retrieval dates
+node_sources	Evidence supporting specific nodes
+expansion_runs	AI requests, model, cost, response and failures
+learning_progress	Questions answered and concepts reviewed
+camera_bookmarks	Saved viewpoints and exploration routes
+settings	Models, preferences, performance options
+
+Edges must have typed relationships, including prerequisite_of, part_of, used_by, related_to, and contrasts_with. A relationship should also store its source and confidence/evidence status.
+
+This is important because AI may claim two concepts are connected even when the relationship is speculative.
+5. How AI expansion will work
+When you click Expand on a sphere:
+1. Read the selected node, its immediate neighbors, domain, user question, and existing concepts.
+2. Request 5–8 structured candidate concepts from the selected LLM.
+3. Validate the output against a strict JSON schema, rejecting invalid IDs, unsupported relationship types, and excessively long content.
+4. Match candidate concepts against existing nodes and reuse matching IDs where appropriate. Do not merge ambiguous concepts automatically.
+5. Save new nodes and edges in a transaction, tagging the content as AI-generated until verified.
+6. Animate new spheres into the existing 3D universe without resetting the camera or disturbing pinned nodes.
+Example:
+Transformers
+
+
+
+
+Self-Attention
+
+
+
+Positional Encoding
+
+
+
+Multi-Head Attention
+
+
+
+Feedforward Layers
+
+
+
+Inference Optimization
+
+
+
+KV Cache
+
+
+
+
+Each of those six concepts becomes independently expandable.
+AI capabilities by development phase
+Feature	First release	Later
+Generate child concepts	Yes	—
+Explain a concept	Yes	—
+Ask follow-up questions	Yes	—
+Expert-level technical examples	Yes	—
+Find cross-domain connections	Basic	Semantic discovery
+Web research with citations	—	Yes
+Import PDFs and schematics	—	Yes
+Personalized learning paths	—	Yes
+Quizzes and spaced repetition	—	Yes
+Multiple AI providers	Adapter ready	Provider selection UI
+
+The initial application must work without an API key through deterministic sample data. When a provider is enabled, server-side environment variables store the credentials; keys never enter the browser bundle or saved graph exports.
+
+Also, a ChatGPT subscription does not automatically include API usage. We'll build a usage and cost meter so AI expansion doesn't silently accumulate charges.
+6. Performance targets for your PC
+Your RTX 4060 and 32 GB of RAM are a reasonable development machine for this WebGL application. But GPU capacity alone doesn't determine graph performance: physics simulation, label rendering, draw calls, and React state updates can all become bottlenecks.
+
+Proposed acceptance targets, to be measured rather than assumed:
+Graph size	Performance target
+50–100 visible nodes	Smooth 60 FPS interaction
+250 visible nodes	45–60 FPS
+500 visible nodes	30+ FPS
+1,000+ stored nodes	Load focused neighborhoods rather than everything at once
+
+To reach those targets, Codex should implement viewport-aware labeling, automatic settling of physics, adaptive pixel ratio, bounded animations, and neighborhood filtering.
+
+Avoid permanent physics movement, heavy bloom effects on every sphere, or individual React re-renders on every physics tick. An actual 3D graph implementation has documented performance issues at a few hundred nodes when rendering patterns are inefficient. 
+Knowledge Graph System
+
+
+One major visual decision: Do not add excessive particles or a distracting starfield in the first version. The nodes themselves should provide the visual richness.
+7. Complete Codex development plan
+I would divide this into six sequential milestones. Each milestone must produce working software with tests before Codex moves on.
+
+Milestone 1 — 3D Universe Prototype
+
+Build the complete dark interface and interactive 3D canvas, seeded with all six domains and roughly 60 sample nodes.
+
+Acceptance: Smooth orbit, pan, zoom, click, focus, labels, search, and visible colored clusters. No backend or AI needed yet.
+
+
+
+
+Milestone 2 — Persistent Graph Engine
+
+Create the backend, SQLite schema, graph CRUD APIs, positions, pinned nodes, and saved camera viewpoints.
+
+Acceptance: Add, edit, connect, expand, delete, save, and reload nodes without losing data. Reloading must preserve the graph.
+
+
+
+
+Milestone 3 — AI Branch Generation
+
+Connect a configurable LLM provider. Generate structured branches, explanations, and suggested relationships. Prevent duplicates and provide retries on failures.
+
+Acceptance: Expand a real topic into meaningful child nodes, then expand a child a second time. All new concepts survive reload.
+
+
+
+
+Milestone 4 — Technical Learning System
+
+Add a proper node inspector with detailed explanations, code snippets, equations, analogies, notes, and follow-up questions.
+
+Acceptance: Select a topic, learn it at multiple expertise levels, and save notes without leaving the universe.
+
+
+
+
+Milestone 5 — Research & Knowledge Connections
+
+Add source-backed web research, document references, relationship evidence, and automatic cross-domain suggestions.
+
+Acceptance: View sources for an explanation and distinguish verified evidence from AI-generated hypotheses. No invented citations.
+
+
+
+
+Milestone 6 — Optimization & Release
+
+Benchmark rendering, add import/export, error recovery, keyboard navigation, camera bookmarks, backups, and production builds.
+
+Acceptance: Pass automated tests, meet measured performance thresholds, export and restore a universe, and run locally without Codex.
+
+
+
+Recommended project directory
+Create a separate directory rather than mixing this project with your existing REA tooling or NBA projects.
+
+In Windows PowerShell, outside Codex, run:
+
+New-Item -ItemType Directory -Force -Path "C:\Projects\Knowledge-Universe" | Out-Null
+Set-Location "C:\Projects\Knowledge-Universe"
+git init
+codex
+
+
+
+That launches Codex in the project root.
+
+The intended repository structure is:
+
+Knowledge-Universe/
+├── apps/
+│   ├── web/
+│   │   └── src/
+│   │       ├── components/
+│   │       ├── graph3d/
+│   │       ├── panels/
+│   │       ├── stores/
+│   │       └── styles/
+│   └── api/
+│       └── src/
+│           ├── routes/
+│           ├── services/
+│           ├── providers/
+│           └── db/
+├── packages/
+│   └── shared/
+│       ├── schemas/
+│       └── types/
+├── docs/
+│   ├── product-spec.md
+│   ├── architecture.md
+│   ├── design-system.md
+│   └── progress.md
+├── tests/
+├── .env.example
+├── package.json
+└── README.md
+
+
+
+8. Master prompt for Codex
+This is the prompt I would use to start the project. It gives Codex the architecture, UI requirements, acceptance tests, and boundaries rather than simply saying "build an app like Recursio."
+Knowledge Universe — Codex master build prompt
+  Copy entire prompt
+Execution instructions
+
+The prompt directs Codex to create the project specifications and implement Milestone 1 first: a functioning 3D universe with all six subject clusters, smooth camera controls, node selection, an inspector, and deterministic demo data.
+
+Later phases are explicitly defined but not authorized for implementation in the first pass. This prevents a sprawling, unfinished prototype.
+
+
+After Codex completes the first milestone, from PowerShell in the project directory, the normal development command should be:
+npm run dev
+
+
+Codex should configure that root script and report the actual local URL. It should also provide a documented production build command and test commands.
+9. What success should look like
+First working release — minimum acceptance checklist
+Progress tracker
+
+0 / 10
+
+
+
+[ ] Actual WebGL 3D scene, not a screenshot or fake 3D CSS
+
+[ ] Six distinctly colored subject clusters
+
+[ ] Orbit, zoom, pan and smooth camera focusing
+
+[ ] At least 60 meaningful sample concepts
+
+[ ] Clickable spheres with responsive inspector
+
+[ ] Node search and camera focus on result
+
+[ ] Collapse and expand side panels
+
+[ ] Keyboard shortcuts and camera reset
+
+[ ] No browser console errors during normal interactions
+
+[ ] Automated test suite and documented local start command
+
+ Copy checklist
+Strategic design decisions
+There are three decisions I'd lock in now.
+
+First, 3D should be the actual interface, not decoration. Clicking, navigating, comparing, pinning, and following a relationship all happen within three-dimensional space. The inspector is there to present information that doesn't belong on a tiny sphere.
+
+Second, the graph must be a learning system, not an idea generator. A normal AI mind map produces a lot of concepts but doesn't necessarily make you understand them. Our app should ultimately track prerequisites, explanations, evidence, learning progress, and connections between subjects.
+
+Third, build an original implementation rather than reverse-engineering Recursio's backend. Your Codex + REA + Ghidra environment is valuable for other projects, particularly native software analysis, but doesn't provide a significant advantage for creating this particular browser-based graph. We already have mature open-source 3D libraries suited to the job.
+Final recommendation
+Start with Milestone 1 and make the universe visually excellent before connecting paid AI APIs. If the core navigation and graph don't feel right, more AI features won't fix the experience.
+
+Once the first release is operational, the highest-value next feature is click-to-expand AI branching, followed by persistent saved knowledge and source-backed technical explanations.
+
+The long-term differentiator is the ability to move naturally between your six subjects and discover genuine connections—for example, between Bayesian fault diagnosis, electronics troubleshooting, prediction modeling, and AI agent decision systems—inside one navigable knowledge universe.

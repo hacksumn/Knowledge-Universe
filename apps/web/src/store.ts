@@ -1,0 +1,3 @@
+import {create} from 'zustand';
+type State={selected:string|null;domain:string|null;leftOpen:boolean;rightOpen:boolean;labels:boolean;motion:boolean;select:(id:string|null)=>void;setDomain:(id:string|null)=>void;toggle:(key:'leftOpen'|'rightOpen'|'labels'|'motion')=>void};
+export const useUniverse=create<State>((set)=>({selected:'ai-0',domain:null,leftOpen:!matchMedia('(max-width: 720px)').matches,rightOpen:!matchMedia('(max-width: 720px)').matches,labels:true,motion:!matchMedia('(prefers-reduced-motion: reduce)').matches,select:(selected)=>set({selected,rightOpen:!!selected}),setDomain:(domain)=>set({domain,selected:null}),toggle:(key)=>set(s=>({[key]:!s[key]}))}));
