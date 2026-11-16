@@ -29,3 +29,12 @@ A supported browser QA tool was unavailable in the build environment. These chec
 4. Technical learning tools, notes and follow-up questions.
 5. Source-backed research and verified relationship evidence.
 6. Measured optimization, import/export, recovery and release validation.
+
+## Catalogue explorer — Phase 1 (subjects and pathways)
+
+- Replaced the catalogue scraped from Kinnu (pathways, lesson titles, artwork, font, page captures) with original content in `apps/web/src/catalogue.ts`: 8 subjects, 25 pathways, 102 stub lessons.
+- Original inline SVG subject art (`apps/web/src/art.tsx`), navy/purple palette, system font, placeholder orbit mark and favicon (logo redesign is Phase 4).
+- Search covers subject, pathway and lesson text; counters derive from the data; the subject chip row scrolls.
+- Verified: `npm test`, `npm run build`, and Playwright runs at 1440×900 and 390×844 (subject cards, chip filter, search, drawer, lesson expansion, Escape) with no console errors and no horizontal overflow.
+
+Next: Phase 2 map view, Phase 3 `related` cross-links, Phase 4 logo.
