@@ -44,3 +44,11 @@ Next: Phase 2 map view, Phase 3 `related` cross-links, Phase 4 logo.
 - Wrote all 102 lessons (about 55,000 words, roughly 400–600 each) as Markdown in `apps/web/src/lessons/<pathway-id>.md`, loaded at build time and rendered with a small safe Markdown subset (headings, lists, callouts, tables, bold, code). Worked examples were checked numerically.
 - Drawer shows the full lesson with a "Next" button; Draft badges remain only for lessons without a section.
 - Tests check every lesson has a 400–650-word body with a key takeaway, no orphan sections, and the Markdown parser.
+
+## Phase 2 — 3D map
+
+- Map | List toggle in the header; the map is the opening screen. The three.js code is split into its own lazily loaded chunk, so the list view does not download it.
+- Globe styling: fresnel rim-lit shell (pink to violet), a web of ~590 points joined to their nearest neighbours, nebula clouds inside, deep-blue starfield outside. Subjects are bright star points on the surface; pathways and lessons are held on the surface near their parent by a custom simulation force.
+- Hover a subject (real mouse movement only) to expand it in place; click to fly in; pathways expand to lessons; lessons open the reading drawer. Hover expansion is ignored for touch input, stale pointer positions and during camera flights.
+- Side panel / mobile bottom sheet mirrors the map for keyboard and touch use. WebGL-unavailable fallback links to the list view. Reduced-motion preference disables camera animation and drift.
+- Verified with Playwright using software WebGL at 1440×900 and 390×844: hover expansion, panel navigation, pathway expansion, lesson drawer, canvas click, list toggle and search, no console errors.

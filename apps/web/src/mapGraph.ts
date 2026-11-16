@@ -16,10 +16,15 @@ export const nodeId = {
   lesson: (id: string) => `l:${id}`,
 };
 
-/** Fixed, deterministic subject positions: a tilted ring around the hub with depth variation. */
+/** Radius of the glowing globe; subjects sit on its surface. */
+export const GLOBE_RADIUS = 360;
+
+/** Fixed, deterministic subject positions: spread evenly over the globe's surface (Fibonacci sphere). */
 export function subjectPosition(index: number, count = continents.length) {
-  const a = (index / count) * Math.PI * 2 - Math.PI / 2;
-  return { x: Math.cos(a) * 330, y: Math.sin(a) * 230, z: Math.sin(index * 1.7 + .6) * 120 };
+  const y = 1 - ((index + .5) / count) * 2;
+  const r = Math.sqrt(1 - y * y);
+  const theta = index * Math.PI * (3 - Math.sqrt(5)) + .9;
+  return { x: Math.cos(theta) * r * GLOBE_RADIUS, y: y * GLOBE_RADIUS, z: Math.sin(theta) * r * GLOBE_RADIUS };
 }
 
 export function buildMapGraph({ subject, pathway }: Expansion) {

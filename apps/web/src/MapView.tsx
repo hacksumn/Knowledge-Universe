@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import SpriteText from 'three-spritetext';
 import { ArrowUpRight, BookOpen, Bookmark, Check, ChevronLeft, ChevronRight, Home, List as ListIcon, Orbit, Pause, Play } from 'lucide-react';
 import { continents, continentById, pathways, pathwaysIn, type ContinentId, type Pathway } from './catalogue';
-import { buildMapGraph, subjectPosition, nodeId, HUB_ID, type Expansion, type MapNodeSpec, type MapLinkSpec } from './mapGraph';
+import { buildMapGraph, subjectPosition, nodeId, HUB_ID, GLOBE_RADIUS, type Expansion, type MapNodeSpec, type MapLinkSpec } from './mapGraph';
 
 type MapNode = MapNodeSpec & { x?: number; y?: number; z?: number; fx?: number; fy?: number; fz?: number };
 type MapLink = Omit<MapLinkSpec, 'source' | 'target'> & { source: string | MapNode; target: string | MapNode };
@@ -39,14 +39,14 @@ function glowSprite(color: string, size: number, opacity: number) {
   s.scale.set(size, size, 1);
   return s;
 }
-// Deterministic pseudo-random numbers so the sky looks the same on every visit.
+// Deterministic pseudo-random numbers so the scene looks the same on every visit.
 function rng(seed: number) { return () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296); }
 function makeSky() {
   const group = new THREE.Group();
   const rand = rng(42), n = 3200, pos = new Float32Array(n * 3), col = new Float32Array(n * 3);
-  const tints = [new THREE.Color('#ffffff'), new THREE.Color('#cfd8ff'), new THREE.Color('#e4dcff'), new THREE.Color('#fff1d6')];
+  const tints = [new THREE.Color('#ffffff'), new THREE.Color('#cfd8ff'), new THREE.Color('#b9c8ff'), new THREE.Color('#e4dcff')];
   for (let i = 0; i < n; i++) {
-    const u = rand() * 2 - 1, t = rand() * Math.PI * 2, r = 2600 + rand() * 3200, s = Math.sqrt(1 - u * u);
+    const u = rand() * 2 - 1, t = rand() * Math.PI * 2, r = 2700 + rand() * 3200, s = Math.sqrt(1 - u * u);
     pos.set([Math.cos(t) * s * r, u * r, Math.sin(t) * s * r], i * 3);
     const c = tints[Math.floor(rand() * tints.length)].clone().multiplyScalar(.45 + rand() * .55);
     col.set([c.r, c.g, c.b], i * 3);
@@ -55,52 +55,115 @@ function makeSky() {
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
   group.add(new THREE.Points(geo, new THREE.PointsMaterial({ size: 1.7, sizeAttenuation: false, vertexColors: true, transparent: true, opacity: .95, depthWrite: false })));
-  const nebulae: [string, number, number, number, number][] = [['#7b5cff', -1800, 900, -2600, 3400], ['#2fb7a8', 2100, -700, -2400, 2800], ['#f17fa1', 400, 1500, 2600, 2400], ['#58b9ff', -2300, -1200, 1600, 2600]];
-  for (const [color, x, y, z, size] of nebulae) { const s = glowSprite(color, size, .16); s.position.set(x, y, z); group.add(s); }
+  // Deep-blue space clouds behind the globe.
+  const nebulae: [string, number, number, number, number, number][] = [['#2b4dff', -1700, 800, -2500, 3600, .22], ['#1d8fff', 2000, -900, -2300, 3000, .18], ['#5b3cff', 300, 1500, -2800, 2600, .16], ['#2a6bff', -2200, -1300, 1500, 2800, .14], ['#ff4fb8', 2300, 1300, 1200, 1800, .07]];
+  for (const [color, x, y, z, size, o] of nebulae) { const s = glowSprite(color, size, o); s.position.set(x, y, z); group.add(s); }
   return group;
 }
 
-// ── Node visuals ───────────────────────────────────────────────────────────
+// ── The glowing globe: rim-lit shell, a web of points and lines, nebula inside ──
+const WEB_COLORS = ['#ff6ad5', '#c08bff', '#8f7cff', '#7fb8ff', '#ffffff'].map(c => new THREE.Color(c));
+function makeGlobe(R: number) {
+  const group = new THREE.Group();
+  const rand = rng(7);
+  // Shell: brighter toward the edge (fresnel), pink at the top-right fading to violet.
+  group.add(new THREE.Mesh(new THREE.SphereGeometry(R, 96, 64), new THREE.ShaderMaterial({
+    uniforms: { pink: { value: new THREE.Color('#ff5fd2') }, violet: { value: new THREE.Color('#7f5cff') }, radius: { value: R } },
+    vertexShader: 'varying vec3 vN; varying vec3 vV; varying vec3 vP; void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); vP = position; gl_Position = projectionMatrix * mv; }',
+    fragmentShader: 'uniform vec3 pink; uniform vec3 violet; uniform float radius; varying vec3 vN; varying vec3 vV; varying vec3 vP; void main(){ float f = pow(1.0 - abs(dot(vN, vV)), 2.4); vec3 c = mix(violet, pink, smoothstep(-0.6, 0.9, (vP.y * 0.7 + vP.x * 0.5) / radius)); gl_FragColor = vec4(c, f * 0.9 + 0.025); }',
+    transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
+  })));
+  group.add(new THREE.Mesh(new THREE.SphereGeometry(R * .99, 64, 48), new THREE.MeshBasicMaterial({ color: '#5a2fd0', transparent: true, opacity: .07, side: THREE.BackSide, blending: THREE.AdditiveBlending, depthWrite: false })));
+
+  // Web points: most on the surface, some inside.
+  const surface = 420, inner = 170, total = surface + inner;
+  const pts: THREE.Vector3[] = [];
+  for (let i = 0; i < surface; i++) {
+    const y = 1 - ((i + .5) / surface) * 2, r = Math.sqrt(1 - y * y), t = i * Math.PI * (3 - Math.sqrt(5));
+    const v = new THREE.Vector3(Math.cos(t) * r, y, Math.sin(t) * r).add(new THREE.Vector3(rand() - .5, rand() - .5, rand() - .5).multiplyScalar(.09)).normalize().multiplyScalar(R);
+    pts.push(v);
+  }
+  for (let i = 0; i < inner; i++) {
+    const v = new THREE.Vector3(rand() * 2 - 1, rand() * 2 - 1, rand() * 2 - 1); if (v.lengthSq() > 1) { i--; continue; }
+    pts.push(v.multiplyScalar(R * .93));
+  }
+  const pos = new Float32Array(total * 3), col = new Float32Array(total * 3), colors: THREE.Color[] = [];
+  pts.forEach((v, i) => { const c = WEB_COLORS[Math.floor(rand() * WEB_COLORS.length)].clone().multiplyScalar(.55 + rand() * .45); colors.push(c); pos.set([v.x, v.y, v.z], i * 3); col.set([c.r, c.g, c.b], i * 3); });
+  const pgeo = new THREE.BufferGeometry();
+  pgeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  pgeo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  group.add(new THREE.Points(pgeo, new THREE.PointsMaterial({ size: 9, map: glow(), vertexColors: true, transparent: true, opacity: .9, blending: THREE.AdditiveBlending, depthWrite: false })));
+
+  // Lines to nearest neighbours (3 for surface points, 2 for inner points), de-duplicated.
+  const seen = new Set<string>(), seg: number[] = [], segCol: number[] = [];
+  pts.forEach((a, i) => {
+    const k = i < surface ? 3 : 2;
+    const near = pts.map((b, j) => [j, a.distanceToSquared(b)] as const).filter(([j]) => j !== i).sort((x, y) => x[1] - y[1]).slice(0, k);
+    for (const [j] of near) {
+      const key = i < j ? `${i}-${j}` : `${j}-${i}`; if (seen.has(key)) continue; seen.add(key);
+      const b = pts[j]; seg.push(a.x, a.y, a.z, b.x, b.y, b.z);
+      segCol.push(colors[i].r, colors[i].g, colors[i].b, colors[j].r, colors[j].g, colors[j].b);
+    }
+  });
+  const lgeo = new THREE.BufferGeometry();
+  lgeo.setAttribute('position', new THREE.Float32BufferAttribute(seg, 3));
+  lgeo.setAttribute('color', new THREE.Float32BufferAttribute(segCol, 3));
+  group.add(new THREE.LineSegments(lgeo, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: .3, blending: THREE.AdditiveBlending, depthWrite: false })));
+
+  // Nebula clouds and a few bright sparkles inside the globe.
+  const cloud = ['#ff4fd8', '#a35cff', '#ffb8f0', '#6a5cff', '#ff8ae6', '#4f7dff'];
+  for (let i = 0; i < 20; i++) {
+    const v = new THREE.Vector3(rand() * 2 - 1, rand() * 2 - 1, rand() * 2 - 1).normalize().multiplyScalar(R * (.15 + rand() * .55));
+    const s = glowSprite(cloud[i % cloud.length], R * (.45 + rand() * .65), .11 + rand() * .12); s.position.copy(v); group.add(s);
+  }
+  for (let i = 0; i < 22; i++) {
+    const v = pts[Math.floor(rand() * surface)];
+    const s = glowSprite(rand() > .5 ? '#ffffff' : '#ffb3ef', 9 + rand() * 15, .4 + rand() * .3); s.position.copy(v); group.add(s);
+  }
+  return group;
+}
+
+// ── Node visuals: glowing stars, brightest for subjects ─────────────────────
 function label(text: string, height: number, color: string, y: number) {
   const s = new SpriteText(text, height, color);
   s.fontFace = 'Inter, system-ui, -apple-system, Segoe UI, sans-serif';
   s.fontWeight = '600';
+  s.strokeWidth = 1.2;
+  s.strokeColor = '#12082a';
   s.material.depthWrite = false;
   s.position.y = y;
   return s;
 }
-function makeNodeObject(n: MapNode, opts: { focused: boolean; dim: boolean; index: number }) {
+function star(color: THREE.Color, core: number, halo: number, opacity: number) {
+  const g = new THREE.Group();
+  g.add(new THREE.Mesh(new THREE.SphereGeometry(core, 20, 16), new THREE.MeshBasicMaterial({ color: color.clone().lerp(new THREE.Color('#ffffff'), .6), transparent: opacity < 1, opacity })));
+  g.add(glowSprite('#' + color.getHexString(), halo, .9 * opacity), glowSprite('#ffffff', halo * .32, .85 * opacity));
+  return g;
+}
+function makeNodeObject(n: MapNode, opts: { focused: boolean; dim: boolean; scale: number }) {
+  const k = opts.scale;
   const g = new THREE.Group();
   const color = new THREE.Color(n.color);
-  const fade = opts.dim ? .35 : 1;
+  const fade = opts.dim ? .45 : 1;
   if (n.kind === 'hub') {
-    g.add(new THREE.Mesh(new THREE.SphereGeometry(16, 32, 24), new THREE.MeshBasicMaterial({ color: '#f3f0ff' })));
-    g.add(glowSprite('#b9adff', 150, .9), glowSprite('#ffffff', 60, .8));
-    g.add(label('Knowledge Universe', 9, '#ece8ff', -34));
+    g.add(star(new THREE.Color('#d9ccff'), 8 * k, 150 * k, 1));
   } else if (n.kind === 'subject') {
-    const r = 17;
-    g.add(new THREE.Mesh(new THREE.SphereGeometry(r, 36, 28), new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: .38, roughness: .55, metalness: .15, transparent: opts.dim, opacity: fade })));
-    g.add(glowSprite(n.color, r * 5.2, .55 * fade));
-    if (opts.index % 2 === 0) {
-      const ring = new THREE.Mesh(new THREE.RingGeometry(r * 1.45, r * 1.85, 64), new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide, transparent: true, opacity: .35 * fade, depthWrite: false }));
-      ring.rotation.set(Math.PI / 2.4, .3 * opts.index, 0);
-      g.add(ring);
-    }
-    g.add(label(n.label, 8.5, opts.dim ? '#8d93ad' : '#f1f3fb', -r - 13));
+    g.add(star(color, 8.5 * k, 125 * k, fade));
+    g.add(label(n.label, 12.5 * k, opts.dim ? '#b7b3cf' : '#ffffff', -26 * k));
   } else if (n.kind === 'pathway') {
-    const r = 6.5;
-    g.add(new THREE.Mesh(new THREE.SphereGeometry(r, 24, 18), new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: .5, roughness: .6 })));
-    g.add(glowSprite(n.color, r * 5, .5));
-    g.add(label(n.label, 4.4, '#e3e6f3', -r - 6.5));
+    g.add(star(color, 4, 40, 1));
+    g.add(label(n.label, 5.5, '#f1ecff', -13));
   } else {
-    const r = 2.6;
-    g.add(new THREE.Mesh(new THREE.OctahedronGeometry(r), new THREE.MeshBasicMaterial({ color: color.clone().lerp(new THREE.Color('#ffffff'), .35) })));
-    g.add(glowSprite(n.color, r * 6, .45));
-    g.add(label(n.label, 2.7, '#d3d7e8', -r - 3.8));
+    g.add(star(color, 2.2, 20, 1));
+    g.add(label(n.label, 3.3, '#e6e0f7', -7.5));
   }
-  if (opts.focused) {
-    const r = n.kind === 'subject' ? 26 : n.kind === 'pathway' ? 11 : n.kind === 'lesson' ? 5.5 : 26;
-    g.add(new THREE.Mesh(new THREE.TorusGeometry(r, n.kind === 'lesson' ? .25 : .5, 8, 72), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: .85 })));
+  if (opts.focused && n.kind !== 'hub') {
+    // A ring lying on the globe's surface around the focused point.
+    const r = n.kind === 'subject' ? 24 * k : n.kind === 'pathway' ? 12 : 6.5;
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(r, n.kind === 'lesson' ? .3 : .55, 8, 72), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: .85 }));
+    const out = new THREE.Vector3(n.x ?? 0, n.y ?? 0, n.z ?? 0);
+    if (out.lengthSq() > 1) ring.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), out.normalize());
+    g.add(ring);
   }
   return g;
 }
@@ -131,12 +194,15 @@ export default function MapView({ saved, onToggleSave, onOpenPathway, onShowList
         if (spec.kind === 'hub') { n.x = n.fx = 0; n.y = n.fy = 0; n.z = n.fz = 0; }
         else if (spec.kind === 'subject') { const p = subjectPosition(continents.findIndex(c => nodeId.subject(c.id) === spec.id)); n.x = n.fx = p.x; n.y = n.fy = p.y; n.z = n.fz = p.z; }
         else {
-          // Children start just outside their parent, fanned out away from the hub, then the simulation spreads them.
+          // Children start on the globe's surface in a small ring around their parent; the simulation then spreads them.
           const parent = cache.current.get(spec.parent!)!;
           const k = siblings.get(spec.parent!) ?? 0; siblings.set(spec.parent!, k + 1);
           const out = new THREE.Vector3(parent.x ?? 0, parent.y ?? 0, parent.z ?? 0); if (out.lengthSq() < 1) out.set(0, 0, 1); out.normalize();
-          const a = k * 2.4, d = spec.kind === 'pathway' ? 30 : 14;
-          n.x = (parent.x ?? 0) + out.x * d + Math.cos(a) * d; n.y = (parent.y ?? 0) + out.y * d + Math.sin(a) * d; n.z = (parent.z ?? 0) + out.z * d + Math.sin(a * 1.3) * d;
+          const t1 = new THREE.Vector3().crossVectors(out, Math.abs(out.y) > .95 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0)).normalize();
+          const t2 = new THREE.Vector3().crossVectors(out, t1);
+          const a = k * 2.4, d = spec.kind === 'pathway' ? 45 : 22;
+          const v = new THREE.Vector3(parent.x ?? 0, parent.y ?? 0, parent.z ?? 0).addScaledVector(t1, Math.cos(a) * d).addScaledVector(t2, Math.sin(a) * d).setLength(GLOBE_RADIUS);
+          n.x = v.x; n.y = v.y; n.z = v.z;
         }
         cache.current.set(spec.id, n);
       }
@@ -153,11 +219,13 @@ export default function MapView({ saved, onToggleSave, onOpenPathway, onShowList
   }, []);
 
   const mobile = size.width < 700;
-  const overviewDistance = mobile ? 1650 : size.width < 1100 ? 900 : 760;
+  const overviewDistance = mobile ? 1800 : size.width < 1100 ? 1120 : 1000;
   // Move camera and target together so the focus point sits in the middle of the area the panel leaves free:
   // left of the side panel on desktop, above the bottom sheet on phones.
+  const flyingUntil = useRef(0);
   const moveCamera = useCallback((cam: THREE.Vector3, target: THREE.Vector3, ms: number) => {
     const api = fg.current; if (!api) return;
+    flyingUntil.current = Date.now() + (reducedMotion ? 0 : ms) + 150;
     const camera = api.camera() as THREE.PerspectiveCamera;
     const dist = cam.distanceTo(target);
     const worldPerPx = (2 * dist * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))) / Math.max(size.height, 1);
@@ -169,30 +237,33 @@ export default function MapView({ saved, onToggleSave, onOpenPathway, onShowList
     api.cameraPosition({ x: c.x, y: c.y, z: c.z }, { x: t.x, y: t.y, z: t.z }, reducedMotion ? 0 : ms);
   }, [mobile, size.width, size.height]);
   const overview = useCallback((ms = 1200) => {
-    moveCamera(new THREE.Vector3(0, -overviewDistance * .16, overviewDistance), new THREE.Vector3(0, 0, 0), ms);
+    moveCamera(new THREE.Vector3(0, overviewDistance * .12, overviewDistance), new THREE.Vector3(0, 0, 0), ms);
   }, [overviewDistance, moveCamera]);
 
   // One-time scene setup: sky, forces, controls.
   useEffect(() => {
     if (!webgl) return;
-    let frame = 0, sky: THREE.Group | null = null, cancelled = false;
+    let frame = 0, sky: THREE.Group | null = null, globe: THREE.Group | null = null, cancelled = false;
     const setup = () => {
       const api = fg.current;
       if (!api) { if (!cancelled) frame = requestAnimationFrame(setup); return; }
       sky = makeSky(); api.scene().add(sky);
+      globe = makeGlobe(GLOBE_RADIUS); api.scene().add(globe);
       api.d3Force('center', null);
-      // Keep pathways and lessons close to their parent's depth so labels stay a similar size on screen.
+      // Hold pathways and lessons on the globe's surface, like points on a planet.
       let simNodes: MapNode[] = [];
-      const flatten = Object.assign((alpha: number) => {
-        for (const n of simNodes) {
+      type Moving = MapNode & { vx?: number; vy?: number; vz?: number };
+      const shell = Object.assign((alpha: number) => {
+        for (const n of simNodes as Moving[]) {
           if (n.kind !== 'pathway' && n.kind !== 'lesson') continue;
-          const parent = cache.current.get(n.parent!); if (!parent) continue;
-          (n as MapNode & { vz?: number }).vz = ((n as MapNode & { vz?: number }).vz ?? 0) + ((parent.z ?? 0) - (n.z ?? 0)) * .12 * alpha;
+          const x = n.x ?? 0, y = n.y ?? 0, z = n.z ?? 0, len = Math.hypot(x, y, z) || 1;
+          const k = ((GLOBE_RADIUS - len) / len) * .6 * alpha;
+          n.vx = (n.vx ?? 0) + x * k; n.vy = (n.vy ?? 0) + y * k; n.vz = (n.vz ?? 0) + z * k;
         }
       }, { initialize: (nodes: MapNode[]) => { simNodes = nodes; } });
-      api.d3Force('flatten', flatten as never);
+      api.d3Force('shell', shell as never);
       api.d3Force('charge')?.strength((n: MapNode) => n.kind === 'lesson' ? -45 : -90);
-      api.d3Force('link')?.distance((l: MapLink) => l.kind === 'lesson' ? 44 : l.kind === 'pathway' ? (idOf(l.target) === expandedPathway.current ? 125 : 72) : 330).strength((l: MapLink) => l.kind === 'subject' ? 0 : 1);
+      api.d3Force('link')?.distance((l: MapLink) => l.kind === 'lesson' ? 48 : l.kind === 'pathway' ? (idOf(l.target) === expandedPathway.current ? 130 : 85) : GLOBE_RADIUS).strength((l: MapLink) => l.kind === 'subject' ? 0 : 1);
       const controls = api.controls() as unknown as { autoRotateSpeed: number; minDistance: number; maxDistance: number; enableDamping: boolean; addEventListener: (t: string, f: () => void) => void };
       controls.autoRotateSpeed = .35; controls.minDistance = 30; controls.maxDistance = 2600; controls.enableDamping = true;
       controls.addEventListener('start', () => setSpin(false));
@@ -201,7 +272,7 @@ export default function MapView({ saved, onToggleSave, onOpenPathway, onShowList
       if (!reducedMotion) frame = requestAnimationFrame(drift);
     };
     frame = requestAnimationFrame(setup);
-    return () => { cancelled = true; cancelAnimationFrame(frame); if (sky) fg.current?.scene().remove(sky); };
+    return () => { cancelled = true; cancelAnimationFrame(frame); if (sky) fg.current?.scene().remove(sky); if (globe) fg.current?.scene().remove(globe); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [webgl]);
 
@@ -213,10 +284,8 @@ export default function MapView({ saved, onToggleSave, onOpenPathway, onShowList
   const flyTo = useCallback((n: MapNode, distance: number, delay = 0) => {
     const go = () => {
       const p = new THREE.Vector3(n.x ?? 0, n.y ?? 0, n.z ?? 0);
-      const parent = n.parent ? cache.current.get(n.parent) : undefined;
-      const away = parent ? p.clone().sub(new THREE.Vector3(parent.x ?? 0, parent.y ?? 0, parent.z ?? 0)) : p.clone();
-      if (away.lengthSq() < 1) away.set(0, 0, 1);
-      const dir = away.normalize().multiplyScalar(.55).add(new THREE.Vector3(0, -.15, 1)).normalize();
+      // Approach from outside the globe, straight down onto the point.
+      const dir = p.lengthSq() < 1 ? new THREE.Vector3(0, .12, 1).normalize() : p.clone().normalize();
       const cam = p.clone().add(dir.multiplyScalar(mobile ? distance * 1.45 : distance));
       moveCamera(cam, p, 1300);
     };
@@ -228,7 +297,7 @@ export default function MapView({ saved, onToggleSave, onOpenPathway, onShowList
   const openSubject = useCallback((id: ContinentId) => {
     setSpin(false);
     setExpansion({ subject: id, pathway: null }); setFocus({ kind: 'subject', id });
-    const n = cache.current.get(nodeId.subject(id)); if (n) flyTo(n, 330);
+    const n = cache.current.get(nodeId.subject(id)); if (n) flyTo(n, 430);
   }, [flyTo]);
   const openPathway = useCallback((id: string) => {
     const p = pathwayById[id]; if (!p) return;
@@ -236,8 +305,19 @@ export default function MapView({ saved, onToggleSave, onOpenPathway, onShowList
     setExpansion({ subject: p.continent, pathway: id }); setFocus({ kind: 'pathway', id });
     // The pathway node may be new (opened from the panel), so let the simulation place it before flying.
     const existing = cache.current.get(nodeId.pathway(id));
-    setTimeout(() => { const n = cache.current.get(nodeId.pathway(id)); if (n) flyTo(n, 200); }, existing ? 450 : 800);
+    setTimeout(() => { const n = cache.current.get(nodeId.pathway(id)); if (n) flyTo(n, 270); }, existing ? 450 : 800);
   }, [flyTo]);
+  // Hovering a subject expands it in place after a short pause, so sweeping across the globe doesn't flicker.
+  const hoverTimer = useRef<number | undefined>(undefined);
+  // Only real mouse movement over the globe counts: not touch, not a stale pointer while the camera moves or drifts.
+  const pointer = useRef({ overCanvas: false, mouse: false, movedAt: 0 });
+  const hoverAllowed = () => pointer.current.overCanvas && pointer.current.mouse && Date.now() - pointer.current.movedAt < 500 && Date.now() > flyingUntil.current;
+  const expandOnHover = useCallback((id: ContinentId) => {
+    if (expansion.subject === id) return;
+    setSpin(false);
+    setExpansion({ subject: id, pathway: null }); setFocus({ kind: 'subject', id });
+  }, [expansion.subject]);
+  useEffect(() => () => window.clearTimeout(hoverTimer.current), []);
   const openLesson = useCallback((pathwayId: string, lessonId: string) => {
     setFocus({ kind: 'lesson', pathway: pathwayId, id: lessonId });
     onOpenPathway(pathwayById[pathwayId], lessonId);
@@ -246,9 +326,8 @@ export default function MapView({ saved, onToggleSave, onOpenPathway, onShowList
   const onNodeClick = useCallback((n: MapNode) => {
     if (n.kind === 'hub') return reset();
     if (n.kind === 'subject') {
-      const id = n.id.slice(2) as ContinentId;
-      if (expansion.subject === id && !expansion.pathway) return reset();
-      return openSubject(id);
+      window.clearTimeout(hoverTimer.current);
+      return openSubject(n.id.slice(2) as ContinentId);
     }
     if (n.kind === 'pathway') {
       const id = n.id.slice(2);
@@ -263,11 +342,11 @@ export default function MapView({ saved, onToggleSave, onOpenPathway, onShowList
   const nodeObject = useCallback((n: MapNode) => makeNodeObject(n, {
     focused: n.id === focusedNodeId && n.kind !== 'hub',
     dim: !!expansion.subject && n.kind === 'subject' && n.id !== nodeId.subject(expansion.subject),
-    index: n.kind === 'subject' ? continents.findIndex(c => nodeId.subject(c.id) === n.id) : 0,
-  }), [focusedNodeId, expansion.subject]);
+    scale: mobile && (n.kind === 'subject' || n.kind === 'hub') ? 1.6 : 1,
+  }), [focusedNodeId, expansion.subject, mobile]);
 
   const linkColor = useCallback((l: MapLink) => {
-    if (l.kind === 'subject') { const sid = idOf(l.target); const lit = !expansion.subject || sid === nodeId.subject(expansion.subject); return lit ? 'rgba(185,173,255,0.30)' : 'rgba(185,173,255,0.10)'; }
+    if (l.kind === 'subject') { const sid = idOf(l.target); const lit = !expansion.subject || sid === nodeId.subject(expansion.subject); return lit ? 'rgba(255,150,235,0.32)' : 'rgba(200,160,255,0.10)'; }
     const c = new THREE.Color((cache.current.get(idOf(l.target))?.color) ?? '#ffffff');
     return `rgba(${Math.round(c.r * 255)},${Math.round(c.g * 255)},${Math.round(c.b * 255)},${l.kind === 'pathway' ? .65 : .45})`;
   }, [expansion.subject]);
@@ -278,21 +357,28 @@ export default function MapView({ saved, onToggleSave, onOpenPathway, onShowList
 
   if (!webgl) return <div className="map-fallback"><Orbit size={40} /><h2>3D map unavailable</h2><p>Your browser could not start WebGL. Turn on hardware acceleration or use the list view.</p><button className="primary" onClick={onShowList}>Open list view <ArrowUpRight size={16} /></button></div>;
 
-  return <div className="map-view" ref={wrap}>
+  return <div className="map-view" ref={wrap}
+    onPointerMove={e => { pointer.current = { overCanvas: (e.target as HTMLElement).tagName === 'CANVAS', mouse: e.pointerType === 'mouse', movedAt: Date.now() }; }}
+    onPointerLeave={() => { pointer.current.overCanvas = false; window.clearTimeout(hoverTimer.current); }}
+    onPointerDown={e => { if (e.pointerType !== 'mouse') pointer.current.mouse = false; }}>
     {size.width > 0 && <ForceGraph3D<MapNode, MapLink>
       ref={fg}
       width={size.width}
       height={size.height}
       graphData={data}
       controlType="orbit"
-      backgroundColor="#05070f"
+      backgroundColor="#040611"
       showNavInfo={false}
       rendererConfig={{ antialias: true, alpha: false }}
       nodeId="id"
       nodeThreeObject={nodeObject}
       nodeLabel={(n: MapNode) => `<div class="map-tooltip"><span style="background:${n.color}"></span>${escapeHtml(n.label)}</div>`}
       onNodeClick={onNodeClick}
-      onNodeHover={(n: MapNode | null) => { if (wrap.current) wrap.current.style.cursor = n ? 'pointer' : 'grab'; }}
+      onNodeHover={(n: MapNode | null) => {
+        if (wrap.current) wrap.current.style.cursor = n ? 'pointer' : 'grab';
+        window.clearTimeout(hoverTimer.current);
+        if (n?.kind === 'subject' && hoverAllowed()) { const id = n.id.slice(2) as ContinentId; hoverTimer.current = window.setTimeout(() => { if (pointer.current.overCanvas && Date.now() > flyingUntil.current) expandOnHover(id); }, 280); }
+      }}
       enableNodeDrag={false}
       linkColor={linkColor}
       linkOpacity={1}
@@ -311,7 +397,7 @@ export default function MapView({ saved, onToggleSave, onOpenPathway, onShowList
         {subject && <><ChevronRight size={13} /><button onClick={() => openSubject(subject.id)} style={{ color: subject.color }}>{subject.name}</button></>}
         {pathway && <><ChevronRight size={13} /><button onClick={() => openPathway(pathway.id)}>{pathway.title}</button></>}
       </nav>
-      <p className="map-hint">Drag to orbit · Scroll or pinch to zoom · Click a planet to expand it</p>
+      <p className="map-hint">Hover a subject to expand it · Click to fly in · Drag to orbit · Scroll to zoom</p>
     </div>
 
     <div className="map-controls">
@@ -323,8 +409,8 @@ export default function MapView({ saved, onToggleSave, onOpenPathway, onShowList
     <aside className="map-panel" style={{ '--accent': subject?.color ?? '#a495ff' } as React.CSSProperties} aria-live="polite">
       {!subject && <>
         <div className="eyebrow">THE KNOWLEDGE UNIVERSE</div>
-        <h2>Pick a planet.</h2>
-        <p className="map-panel-text">{continents.length} subjects orbit the center. Choose one to reveal its pathways.</p>
+        <h2>Pick a subject.</h2>
+        <p className="map-panel-text">Each bright point on the globe is a subject. {mobile ? 'Tap one to fly in' : 'Hover one to expand it, click to fly in'}, or choose below.</p>
         <ul className="map-list">{continents.map(c => <li key={c.id}><button onClick={() => openSubject(c.id)}><span className="color-dot" style={{ background: c.color }} /><span>{c.name}<small>{pathwaysIn(c.id).length} pathways</small></span><ChevronRight size={15} /></button></li>)}</ul>
       </>}
       {subject && !pathway && <>

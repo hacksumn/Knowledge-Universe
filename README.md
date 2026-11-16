@@ -31,6 +31,18 @@ Subject artwork is drawn as inline SVG in `apps/web/src/art.tsx`, one motif per 
 
 ## Explore
 
+### Map (opening screen)
+
+The map is a glowing 3D globe built with three.js (`apps/web/src/MapView.tsx`, loaded only when the map is shown). Each bright point on its surface is a subject.
+
+- Hover a subject to expand it in place and show its pathways; click it to fly the camera in. On touch screens, tap to fly in.
+- Click a pathway to show its lessons; click a lesson to open it in the reading drawer.
+- Drag to orbit, scroll or pinch to zoom. The home button returns to the whole globe; the play/pause button toggles slow rotation.
+- The side panel (a bottom sheet on phones) mirrors the map, so everything is also reachable by keyboard and touch.
+- Graph structure is built by the pure module `apps/web/src/mapGraph.ts`, covered by `tests/mapGraph.test.ts`.
+
+### List
+
 - Browse subjects, filter with the subject chips (the row scrolls horizontally) or search pathway, subject and lesson text. `/` focuses search.
 - Open a pathway to see its lessons; select a lesson to read it, and use **Next** to move through the pathway.
 - Bookmark pathways and find them in My collection (stored in this browser).
