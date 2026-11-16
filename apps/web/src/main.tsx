@@ -1,10 +1,13 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
-import { ArrowUpRight, ArrowRight, Search, X, ChevronRight, ChevronDown, Compass, Bookmark, BookOpen, Sparkles, Globe2, Menu, Check, Layers } from 'lucide-react';
+import { ArrowUpRight, ArrowRight, Search, X, ChevronRight, ChevronDown, Compass, Bookmark, BookOpen, Sparkles, Globe2, Menu, Check, Layers, Orbit, List as ListIcon } from 'lucide-react';
 import { continents, continentById, pathways, pathwaysIn, totalLessons, matchesQuery, matchingLesson, type ContinentId, type Pathway } from './catalogue';
 import { SubjectArt } from './art';
 import { LessonMarkdown } from './lessonMarkdown';
 import './styles.css';
+
+// The 3D map pulls in three.js, so it loads only when the map is shown.
+const MapView = lazy(() => import('./MapView'));
 
 const SAVED_KEY = 'ku-saved-v2';
 const knownIds = new Set(pathways.map(p => p.id));
@@ -25,6 +28,8 @@ function App() {
   const [selected, setSelected] = useState<Pathway | null>(null);
   const [openLesson, setOpenLesson] = useState<string | null>(null);
   const [menu, setMenu] = useState(false);
+  const [view, setView] = useState<'map' | 'list'>('map');
+  const pendingScroll = useRef<null | 'explore' | 'search'>(null);
   const search = useRef<HTMLInputElement>(null), close = useRef<HTMLButtonElement>(null), lastFocus = useRef<HTMLElement | null>(null);
 
   const filtered = pathways.filter(p => (category === 'all' || p.continent === category) && (!savedOnly || saved.includes(p.id)) && matchesQuery(p, query));
@@ -40,18 +45,30 @@ function App() {
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if (e.key === 'Escape') { setSelected(null); setMenu(false); }
-      if (e.key === '/' && !(e.target as HTMLElement).matches('input')) { e.preventDefault(); search.current?.focus(); explore(); }
+      if (e.key === '/' && !(e.target as HTMLElement).matches('input')) { e.preventDefault(); pendingScroll.current = 'search'; setView('list'); setTick(t => t + 1); }
     };
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
   }, []);
 
-  function openPathway(p: Pathway) { setOpenLesson(null); setSelected(p); }
+  function openPathway(p: Pathway, lessonId?: string) {
+    setOpenLesson(lessonId ?? null); setSelected(p);
+    if (lessonId) setTimeout(() => document.getElementById(`lesson-${lessonId}`)?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 320);
+  }
   function save(id: string) { setSaved(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id]); }
-  function explore() { document.getElementById('explore')?.scrollIntoView({ behavior: 'smooth' }); }
-  function home() { setCategory('all'); setQuery(''); setSavedOnly(false); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+  // Switching from the map to the list renders the list first, then scrolls (see the effect below).
+  function explore() { pendingScroll.current = 'explore'; setView('list'); setTick(t => t + 1); }
+  function showList() { setSavedOnly(false); setView('list'); window.scrollTo({ top: 0 }); }
+  function showMap() { setView('map'); setMenu(false); window.scrollTo({ top: 0 }); }
+  function home() { setCategory('all'); setQuery(''); setSavedOnly(false); showMap(); }
   function collection() { setSavedOnly(true); setCategory('all'); setQuery(''); explore(); }
   function resetFilters() { setCategory('all'); setQuery(''); setSavedOnly(false); }
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    if (view !== 'list' || !pendingScroll.current) return;
+    const target = pendingScroll.current; pendingScroll.current = null;
+    requestAnimationFrame(() => { document.getElementById('explore')?.scrollIntoView({ behavior: 'smooth' }); if (target === 'search') search.current?.focus({ preventScroll: true }); });
+  }, [view, tick]);
   const showSubjects = category === 'all' && !query && !savedOnly;
   const selectedContinent = selected ? continentById[selected.continent] : null;
 
@@ -59,13 +76,21 @@ function App() {
     <header className="header">
       <a href="#" className="brand" onClick={e => { e.preventDefault(); home(); }} aria-label="Knowledge Universe home"><span className="brand-mark" />knowledge<span className="brand-universe">universe</span><span className="brand-beta">EXPLORER</span></a>
       <nav aria-label="Main navigation">
-        <button className={!savedOnly ? 'nav-active' : ''} onClick={() => { setSavedOnly(false); explore(); }}>Explore</button>
-        <button className={savedOnly ? 'nav-active' : ''} onClick={collection}>My collection <span>{saved.length}</span></button>
+        <div className="view-toggle" role="group" aria-label="View">
+          <button className={view === 'map' ? 'on' : ''} aria-pressed={view === 'map'} onClick={showMap}><Orbit size={14} /> Map</button>
+          <button className={view === 'list' && !savedOnly ? 'on' : ''} aria-pressed={view === 'list' && !savedOnly} onClick={showList}><ListIcon size={14} /> List</button>
+        </div>
+        <button className={view === 'list' && savedOnly ? 'nav-active' : ''} onClick={collection}>My collection <span>{saved.length}</span></button>
       </nav>
-      <button className="header-cta" onClick={explore}>Start exploring <ArrowUpRight size={16} /></button>
+      <button className="header-cta" onClick={() => openPathway(pathways[Math.floor(Math.random() * pathways.length)])}>Surprise me <Sparkles size={15} /></button>
       <button className="mobile-menu icon-button" aria-label="Toggle navigation" aria-expanded={menu} onClick={() => setMenu(!menu)}><Menu /></button>
-      {menu && <div className="mobile-nav"><button onClick={() => { setSavedOnly(false); setMenu(false); explore(); }}>Explore</button><button onClick={() => { collection(); setMenu(false); }}>My collection ({saved.length})</button></div>}
+      {menu && <div className="mobile-nav"><button onClick={showMap}>Map</button><button onClick={() => { showList(); setMenu(false); }}>List</button><button onClick={() => { collection(); setMenu(false); }}>My collection ({saved.length})</button></div>}
     </header>
+    {view === 'map' ? <main className="map-main">
+      <Suspense fallback={<div className="map-loading"><Orbit size={30} /> Loading the universe…</div>}>
+        <MapView saved={saved} onToggleSave={save} onOpenPathway={openPathway} onShowList={showList} />
+      </Suspense>
+    </main> : <>
     <main>
       <section className="hero">
         <div className="hero-copy">
@@ -133,6 +158,7 @@ function App() {
       </section>
     </main>
     <footer><a className="footer-brand" href="#" onClick={e => { e.preventDefault(); home(); }}><span className="brand-mark" />Knowledge Universe</a><p>Built for curious minds.</p><span>{totalLessons} lessons across {pathways.length} pathways in {continents.length} subjects.</span></footer>
+    </>}
 
     {selected && selectedContinent && <div className="drawer-backdrop" onMouseDown={e => { if (e.target === e.currentTarget) setSelected(null); }}>
       <section className="drawer" role="dialog" aria-modal="true" aria-labelledby="pathway-title" style={{ '--accent': selectedContinent.color } as React.CSSProperties} onKeyDown={e => { if (e.key === 'Tab') { const elements = e.currentTarget.querySelectorAll<HTMLElement>('button,a[href]'); const first = elements[0], last = elements[elements.length - 1]; if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); } else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); } } }}>
