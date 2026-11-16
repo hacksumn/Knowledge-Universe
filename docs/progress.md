@@ -38,3 +38,9 @@ A supported browser QA tool was unavailable in the build environment. These chec
 - Verified: `npm test`, `npm run build`, and Playwright runs at 1440×900 and 390×844 (subject cards, chip filter, search, drawer, lesson expansion, Escape) with no console errors and no horizontal overflow.
 
 Next: Phase 2 map view, Phase 3 `related` cross-links, Phase 4 logo.
+
+## Lesson content
+
+- Wrote all 102 lessons (about 55,000 words, roughly 400–600 each) as Markdown in `apps/web/src/lessons/<pathway-id>.md`, loaded at build time and rendered with a small safe Markdown subset (headings, lists, callouts, tables, bold, code). Worked examples were checked numerically.
+- Drawer shows the full lesson with a "Next" button; Draft badges remain only for lessons without a section.
+- Tests check every lesson has a 400–650-word body with a key takeaway, no orphan sections, and the Markdown parser.

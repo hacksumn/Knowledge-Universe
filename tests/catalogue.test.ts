@@ -1,5 +1,7 @@
 import {describe,it,expect} from 'vitest';
 import {continents,pathways,continentById,pathwaysIn,totalLessons,matchesQuery,matchingLesson} from '../apps/web/src/catalogue';
+import {lessonBodies,parseLessonFile} from '../apps/web/src/lessons';
+import {parseBlocks} from '../apps/web/src/lessonMarkdown';
 
 describe('Knowledge Universe catalogue',()=>{
  it('defines the eight subjects with a color, tagline and description',()=>{
@@ -36,5 +38,23 @@ describe('Knowledge Universe catalogue',()=>{
   expect(ids('nonexistent123')).toEqual([]);
   expect(matchingLesson(pathways[1],'walk-forward')?.title).toBe('Walk-forward validation');
   expect(matchingLesson(pathways[1],'')).toBeUndefined();
+ });
+ it('has a written body of roughly 400–600 words for every lesson, with no orphan sections',()=>{
+  const ids=new Set(pathways.flatMap(p=>p.lessons.map(l=>l.id)));
+  expect(Object.keys(lessonBodies).filter(k=>!ids.has(k))).toEqual([]);
+  for(const p of pathways)for(const l of p.lessons){
+   expect(l.body,l.id).toBeTruthy();
+   const words=l.body!.replace(/[|#>*`-]/g,' ').split(/\s+/).filter(Boolean).length;
+   expect(words,l.id).toBeGreaterThanOrEqual(400);
+   expect(words,l.id).toBeLessThanOrEqual(650);
+   expect(l.body,l.id).toMatch(/\*\*Key takeaway:\*\*/);
+  }
+ });
+ it('parses lesson files and the Markdown subset used in lessons',()=>{
+  expect(parseLessonFile('p','@@ a\r\nOne.\r\n\r\n@@ b\nTwo.\n')).toEqual({'p/a':'One.','p/b':'Two.'});
+  const blocks=parseBlocks('## Head\n\nPara **bold**\nwraps.\n\n- x\n- y\n\n1. one\n2. two\n\n> **Key takeaway:** z\n\n| A | B |\n|---|---|\n| 1 | 2 |');
+  expect(blocks.map(b=>b.type)).toEqual(['heading','p','ul','ol','callout','table']);
+  expect(blocks[1]).toEqual({type:'p',text:'Para **bold** wraps.'});
+  expect(blocks[5]).toEqual({type:'table',header:['A','B'],rows:[['1','2']]});
  });
 });

@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { ArrowUpRight, ArrowRight, Search, X, ChevronRight, ChevronDown, Compass, Bookmark, BookOpen, Sparkles, Globe2, Menu, Check, Layers } from 'lucide-react';
 import { continents, continentById, pathways, pathwaysIn, totalLessons, matchesQuery, matchingLesson, type ContinentId, type Pathway } from './catalogue';
 import { SubjectArt } from './art';
+import { LessonMarkdown } from './lessonMarkdown';
 import './styles.css';
 
 const SAVED_KEY = 'ku-saved-v2';
@@ -144,13 +145,13 @@ function App() {
           <ol className="lessons">
             {selected.lessons.map((l, i) => {
               const open = openLesson === l.id;
-              return <li key={l.id} className={open ? 'open' : ''}>
+              return <li key={l.id} id={`lesson-${l.id}`} className={open ? 'open' : ''}>
                 <button aria-expanded={open} onClick={() => setOpenLesson(open ? null : l.id)}>
                   <span className="lesson-number">{String(i + 1).padStart(2, '0')}</span>
                   <span className="lesson-title">{l.title}{!l.body && <span className="draft-badge">Draft</span>}</span>
                   <ChevronDown size={16} />
                 </button>
-                {open && <div className="lesson-body"><p className="lesson-summary">{l.summary}</p>{l.body ? l.body.split(/\n{2,}/).map((para, j) => <p key={j}>{para}</p>) : <p className="stub-note">This lesson is a stub. Add a <code>body</code> to it in <code>apps/web/src/catalogue.ts</code> to publish it.</p>}</div>}
+                {open && <div className="lesson-body"><p className="lesson-summary">{l.summary}</p>{l.body ? <LessonMarkdown source={l.body} /> : <p className="stub-note">This lesson is a draft. Write it in <code>apps/web/src/lessons/{selected.id}.md</code> under <code>@@ {l.id.split('/')[1]}</code>.</p>}{i < selected.lessons.length - 1 && <button className="next-lesson" onClick={() => { const next = selected.lessons[i + 1].id; setOpenLesson(next); requestAnimationFrame(() => document.getElementById(`lesson-${next}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })); }}>Next: {selected.lessons[i + 1].title} <ArrowRight size={14} /></button>}</div>}
               </li>;
             })}
           </ol>

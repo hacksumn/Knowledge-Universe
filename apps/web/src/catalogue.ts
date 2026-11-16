@@ -1,6 +1,7 @@
 // Knowledge Universe catalogue: subjects ("continents") → pathways → lessons.
-// All content here is original. Lessons without a `body` are stubs: add a
-// `body` string to a lesson to publish it; the drawer shows stubs as drafts.
+// All content here is original. Lesson bodies are Markdown in lessons/<pathway-id>.md;
+// a lesson without a body is shown as a draft.
+import { lessonBodies } from './lessons';
 
 export type ContinentId =
   | 'machine-learning'
@@ -46,10 +47,10 @@ export const continents: Continent[] = [
   { id: 'pcb-diagnostics', name: 'PCB Diagnostics', color: '#bcda73', tagline: 'Trace signals. Find the fault.', description: 'A systematic way to find faults on electronic boards.' },
 ];
 
-const slug = (s: string) => s.toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+export const slug = (s: string) => s.toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
 function pathway(continent: ContinentId, id: string, title: string, description: string, lessons: [string, string][]): Pathway {
-  return { id, continent, title, description, lessons: lessons.map(([t, summary]) => ({ id: `${id}/${slug(t)}`, title: t, summary })) };
+  return { id, continent, title, description, lessons: lessons.map(([t, summary]) => { const lessonId = `${id}/${slug(t)}`; return { id: lessonId, title: t, summary, body: lessonBodies[lessonId] }; }) };
 }
 
 export const pathways: Pathway[] = [
