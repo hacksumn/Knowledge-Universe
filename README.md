@@ -1,40 +1,27 @@
-# Knowledge Universe
+﻿# Knowledge Universe
 
-Milestone 1 of the supplied product blueprint: a real WebGL 2 knowledge explorer built with React 19, TypeScript, Vite, Zustand, Three.js and react-force-graph-3d.
+A React 19 + TypeScript explorer inspired by Kinnu's Kinnuverse, rebuilt from the live page and the supplied REA reference capture.
 
-## Run locally
-
-Install Node.js 22 or newer, unzip this project, and open a terminal in the directory containing package.json:
+## Run
 
 ```sh
 npm ci
 npm run dev
+npm run build
+npm test
 ```
 
-Vite prints the actual local URL (normally http://localhost:5173; it chooses another port if occupied). Keep the terminal running. No API key or backend is required. Internet access is needed to install packages; Google Fonts are optional and fall back to system fonts.
-
-```sh
-npm test          # graph integrity, connectivity, domain coverage, search, deterministic data
-npm run build    # TypeScript validation + production bundle in dist/
-npm run preview  # serve the production bundle, normally http://localhost:4173
-```
+The local Vite server normally runs at http://localhost:5173. No backend or API key is needed. Artwork, typography, and the learning catalogue are served locally.
 
 ## Explore
 
-- Left drag: orbit. Right drag: pan. Scroll: zoom.
-- Click a concept: select it, inspect its description and move the camera toward it. Double-click or F: focus.
-- Click an edge: inspect the curated relationship and its evidence status.
-- Search titles and descriptions; Enter focuses the first result.
-- Select a domain to view its neighborhood. Home returns to all six.
-- Shift + drag a sphere: reposition and pin it for this session.
-- Side panels collapse independently. Immersive view hides both.
-- `/`: search. Escape: deselect and close dialogs. Home: universe overview.
-- Preferences: disable camera animation, hide labels, release all pinned concepts.
+- Browse seven continents and 100 pathways containing 899 source lesson links.
+- Filter by continent or search pathway titles and lesson titles. `/` focuses search.
+- Open a pathway to see its ordered lessons. Lessons open on Kinnu in another tab.
+- Bookmark pathways and find them in My collection; bookmarks persist in this browser.
+- Use Surprise me or select an origami tile for a discovery.
+- Escape closes the drawer; keyboard focus stays within the open drawer.
 
-## Scope and verification
+The responsive interface uses Kinnu's reference artwork with an original explorer layout. It does not copy the source marketing page or host the lesson article bodies. Reference findings, evidence IDs, design choices, and browser verification are recorded in [docs/rebuild-evidence.md](docs/rebuild-evidence.md).
 
-61 concepts, six domain clusters, typed links and eight cross-domain links. All descriptions and relationship rationales are curated demo content, not source-verified research. There are no LLM calls, fake AI controls, credentials, persistence, accounts, saved notes, or backend services. Reload restores the deterministic dataset. AI expansion is explicitly marked as a future milestone.
-
-The renderer caps pixel ratio at 1.5 after settling, uses small sphere meshes and restrained halos, stops physics after a bounded settling period, and shows labels for the selected neighborhood. Reduced-motion preferences disable camera transitions by default. Performance targets from the blueprint remain unmeasured. Browser interaction QA and console checks were not available in the build environment; see docs/progress.md for the manual acceptance checklist.
-
-Future architecture and milestone boundaries are documented under docs/. This repository intentionally does not scaffold nonfunctional API or database code in Milestone 1.
+The original graph dataset and its tests are retained but no longer drive the interface.
